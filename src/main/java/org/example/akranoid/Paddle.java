@@ -8,11 +8,13 @@ public class Paddle extends MovableObject {
 
     protected double speed; // tốc độ di chuyển
     protected PowerUp currentPowerUp; // Power-up đang được áp dụng (nếu có)
+    private double gameWidth; // chiều rộng màn hình game
 
-    public Paddle(double x, double y, double width, double height, double speed) {
+    public Paddle(double x, double y, double width, double height, double speed, double gameWidth) {
         super(x, y, width, height);
         this.speed = speed;
         this.currentPowerUp = null;
+        this.gameWidth = width;
     }
 
     public double getSpeed() {
@@ -32,11 +34,15 @@ public class Paddle extends MovableObject {
     }
 
     public void moveLeft() {
-        // TODO: di chuyển paddle sang trái
+        setDX(-speed);
     }
 
     public void moveRight() {
-        // TODO: di chuyển paddle sang phải
+        setDX(speed);
+    }
+
+    public void stop() {
+        setDX(0);
     }
 
     public void applyPowerUp(PowerUp powerUp) {
@@ -45,7 +51,14 @@ public class Paddle extends MovableObject {
 
     @Override
     public void update() {
-        // TODO: cập nhật vị trí hoặc trạng thái paddle
+        move();
+        if (x < 0) {
+            x = 0;
+        }
+
+        if (x + width > this.gameWidth) {
+            x = this.Gamewidth - width;
+        }
     }
 
     @Override
