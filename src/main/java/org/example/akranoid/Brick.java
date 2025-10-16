@@ -32,7 +32,9 @@ public class Brick extends GameObject {
     }
 
     public void takeHit() {
-        // TODO: giảm hitPoints khi bị bóng va chạm
+        if (this.hitPoints > 0) {
+            this.hitPoints--;
+        }
     }
 
     public boolean isDestroyed() {
