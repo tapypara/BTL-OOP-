@@ -14,7 +14,7 @@ public class Paddle extends MovableObject {
         super(x, y, width, height);
         this.speed = speed;
         this.currentPowerUp = null;
-        this.gameWidth = gameWidth;
+        this.gameWidth = width;
     }
 
     public double getSpeed() {
@@ -67,4 +67,3 @@ public class Paddle extends MovableObject {
         // TODO: vẽ paddle lên màn hình
     }
 }
-
