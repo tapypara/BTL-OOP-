@@ -1,4 +1,7 @@
-package org.example.akranoid;
+package org.example.baitaplon;
+
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 
 /**
  * Đại diện cho quả bóng trong game.
@@ -9,16 +12,26 @@ public class Ball extends MovableObject {
     protected double speed;       // Tổng tốc độ (magnitude)
     protected double directionX;  // Thành phần hướng X (chuẩn hóa)
     protected double directionY;  // Thành phần hướng Y (chuẩn hóa)
+    private Image image;
+    // Biến trạng thái
+    private boolean isStuck;
+    private Paddle paddleReference;
 
     public Ball(double x, double y, double radius, double speed, double directionX, double directionY) {
         super(x, y, radius * 2, radius * 2);
         this.speed = speed;
         this.directionX = directionX;
         this.directionY = directionY;
-
-
         setDx(speed * directionX);
         setDy(speed * directionY);
+        try {
+            String imagePath = "/assets/ball.png";
+            this.image = new Image(getClass().getResource(imagePath).toExternalForm());
+        } catch (NullPointerException e) {
+            System.err.println("Không thể load ảnh ball: " + e.getMessage());
+        }
+        this.isStuck = true;
+        this.paddleReference = null;
     }
 
     // ... (Getters/Setters cho speed, directionX, directionY)
@@ -46,6 +59,29 @@ public class Ball extends MovableObject {
         this.directionY = directionY;
     }
 
+    public boolean isStuck() {
+        return isStuck;
+    }
+
+    public void setStuck(boolean stuck) {
+        isStuck = stuck;
+        if (!stuck) {
+            // Nếu bóng được bắn ra, đặt hướng ban đầu (ví dụ: lên trên)
+            // Dùng lại hướng đã khởi tạo, nhưng đảm bảo dy != 0
+            setDx(speed * directionX);
+            setDy(-speed * Math.abs(directionY));
+        } else {
+            // Nếu dính, dừng vận tốc
+            setDx(0);
+            setDy(0);
+        }
+    }
+
+
+    public void setPaddleReference(Paddle paddleReference) {
+        this.paddleReference = paddleReference;
+    }
+
     /**
      * Kiểm tra va chạm hộp bao (AABB)
      */
@@ -62,16 +98,23 @@ public class Ball extends MovableObject {
      */
     @Override
     public void update() {
-        // Cập nhật dx, dy dựa trên speed và direction (chuẩn hóa vận tốc)
-        setDx(speed * directionX);
-        setDy(speed * directionY);
-
-        // Gọi move() từ MovableObject để cập nhật x và y
-        move();
+        if (isStuck && paddleReference != null) {
+            // Cập nhật vị trí bóng theo vị trí của paddle
+            // Đặt bóng ở trung tâm chiều rộng của paddle, và ở ngay phía trên paddle
+            x = paddleReference.getX() + paddleReference.getWidth() / 2 - width / 2;
+            y = paddleReference.getY() - height;
+        } else {
+            // Nếu không dính, cập nhật vị trí theo vận tốc
+            // Cập nhật dx, dy dựa trên speed và direction
+            setDx(speed * directionX);
+            setDy(speed * directionY);
+            move();
+        }
     }
 
     /**
      * Xử lý nảy bóng (Cải tiến logic nảy)
+     *
      * @param other Vật thể va chạm
      */
     public void bounceOff(GameObject other) {
@@ -109,8 +152,15 @@ public class Ball extends MovableObject {
         }
     }
 
-    @Override
-    public void render() {
-        // TODO: logic vẽ bóng (sẽ dùng GraphicsContext trong MainApplication)
-    }
+
+        @Override
+        public void render (GraphicsContext gc){
+            if (image != null) {
+                gc.drawImage(image, x, y, width, height);
+            } else {
+                // (Tùy chọn) Vẽ hình tròn màu nếu không load được ảnh
+                gc.setFill(javafx.scene.paint.Color.RED);
+                gc.fillOval(x, y, width, height);
+            }
+        }
 }
