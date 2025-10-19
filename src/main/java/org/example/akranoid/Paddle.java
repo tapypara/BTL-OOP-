@@ -1,4 +1,7 @@
-package org.example.akranoid;
+package org.example.baitaplon;
+
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 
 /**
  * Đại diện cho thanh đỡ (Paddle) do người chơi điều khiển.
@@ -9,14 +12,22 @@ public class Paddle extends MovableObject {
     protected double speed; // tốc độ di chuyển
     protected PowerUp currentPowerUp; // Power-up đang được áp dụng (nếu có)
     private double gameWidth; // chiều rộng màn hình game
+    private Image image;
 
     public Paddle(double x, double y, double width, double height, double speed, double gameWidth) {
         super(x, y, width, height);
         this.speed = speed;
         this.currentPowerUp = null;
         this.gameWidth = gameWidth;
+        try {
+            // Đường dẫn bắt đầu từ gốc của 'resources'
+            String imagePath = "/assets/paddle.png";
+            this.image = new Image(getClass().getResource(imagePath).toExternalForm());
+        } catch (NullPointerException e) {
+            System.err.println("Không thể load ảnh paddle: " + e.getMessage());
+            // Có thể thêm code để vẽ hình chữ nhật thay thế nếu không load được ảnh
+        }
     }
-
     public double getSpeed() {
         return speed;
     }
@@ -63,8 +74,19 @@ public class Paddle extends MovableObject {
     }
 
     @Override
-    public void render() {
-        // TODO: vẽ paddle lên màn hình
+    public void render(GraphicsContext gc) { // Đảm bảo có tham số gc
+        if (image != null) {
+            // Chỉ vẽ ảnh nếu image không null
+            gc.drawImage(image, x, y, width, height);
+
+            // XÓA BỎ bất kỳ dòng code vẽ hình chữ nhật nào khác ở đây
+            // Ví dụ: Đảm bảo không còn dòng gc.fillRect(...) nào trong khối if này
+        } else {
+            // Vẽ hình chữ nhật màu CHỈ KHI image là null
+            gc.setFill(javafx.scene.paint.Color.BLUE); // Hoặc màu khác
+            gc.fillRect(x, y, width, height);
+        }
     }
 }
+
 
