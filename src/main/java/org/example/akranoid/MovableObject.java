@@ -1,4 +1,6 @@
-package org.example.akranoid;
+package org.example.baitaplon;
+
+import javafx.scene.canvas.GraphicsContext;
 
 /**
  * Lớp trừu tượng mở rộng từ GameObject,
@@ -49,6 +51,10 @@ public abstract class MovableObject extends GameObject {
     /**
      * Vẽ đối tượng lên màn hình.
      */
+    /**
+     * Vẽ đối tượng lên màn hình.
+     * @param gc Đối tượng GraphicsContext để vẽ.
+     */
     @Override
-    public abstract void render();
+    public abstract void render(GraphicsContext gc);
 }
