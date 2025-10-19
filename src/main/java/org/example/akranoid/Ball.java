@@ -1,4 +1,4 @@
-package org.example.baitaplon;
+package org.example.arkanoid;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
@@ -164,3 +164,4 @@ public class Ball extends MovableObject {
             }
         }
 }
+
