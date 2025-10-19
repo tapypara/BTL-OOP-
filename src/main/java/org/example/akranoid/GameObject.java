@@ -1,4 +1,6 @@
-package org.example.akranoid;
+package org.example.baitaplon;
+
+import javafx.scene.canvas.GraphicsContext;
 
 /**
  * Lớp trừu tượng đại diện cho mọi đối tượng trong game.
@@ -51,6 +53,7 @@ public abstract class GameObject {
 
     /**
      * draw.
+     * @param gc Cây cọ vẽ lên Canvas
      */
-    public abstract void render();
+    public abstract void render(GraphicsContext gc);
 }
