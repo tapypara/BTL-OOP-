@@ -26,13 +26,14 @@ public class GameManager {
         isGameOver = false;
     }
 
+    
     private void createBricks() {
         bricks.clear();
-        int brickWidth = 60;
-        int brickHeight = 20;
-        for (int i = 0; i < 5; i++) {
+        int brickWidth = 80;
+        int brickHeight = 40;
+        for (int i = 0; i < 7; i++) {
             for (int j = 0; j < 10; j++) {
-                bricks.add(new Brick(j * (brickWidth + 10) + 55, i * (brickHeight + 10) + 50, brickWidth, brickHeight, 1, "blue"));
+                bricks.add(new Brick(j * brickWidth , i * brickHeight + 100, brickWidth, brickHeight, 1, "blue"));
             }
         }
     }
@@ -106,4 +107,5 @@ public class GameManager {
         return ball;
     }
 }
+
 
