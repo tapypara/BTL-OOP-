@@ -13,7 +13,6 @@ public class MenuScreen extends Pane {
 
     private Image startScreenImg;
     private Image startButtonImg;
-    private Image levelButtonImg;
     private Image exitButtonImg;
 
     private Image soundOnImg;

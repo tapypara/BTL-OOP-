@@ -1,4 +1,3 @@
-// <<< SỬA DÒNG PACKAGE (Đã đúng) >>>
 package org.example.baitaplon.model;
 
 import javafx.scene.canvas.GraphicsContext;
@@ -6,89 +5,113 @@ import javafx.scene.image.Image;
 
 /**
  * Đại diện cho viên gạch trong game.
- * Lớp này giờ đã được nâng cấp để tải bất kỳ ảnh nào.
+ * Đã nâng cấp hàm takeHit() để xử lý việc chuyển loại gạch (degradation).
  */
-// <<< GameObject ở cùng package (Đã đúng) >>>
 public class Brick extends GameObject {
 
-    // ... (Code này đã chuẩn, giữ nguyên) ...
     protected int hitPoints;
-    protected String type; // 'type' giờ sẽ là "blue_brick", "red_brick"...
+    protected String type;
     private Image image;
 
-    /**
-     * Hàm constructor (Đã chuẩn, giữ nguyên)
-     * Nó nhận 'type' là tên file ảnh (ví dụ: "blue_brick")
-     */
     public Brick(double x, double y, double width, double height, int hitPoints, String type) {
         super(x, y, width, height);
         this.hitPoints = hitPoints;
         this.type = type;
-        loadImageByType(this.type); // Gọi hàm đã được nâng cấp
+        loadImageByType(this.type);
     }
 
-    // <<< THAY ĐỔI CHÍNH NẰM Ở ĐÂY >>>
     /**
-     * HÀM ĐƯỢC NÂNG CẤP:
      * Tải ảnh gạch dựa trên "type" (tên file không có .png)
-     * @param typeName Ví dụ: "blue_brick", "red_brick", "unbreakable_brick"
      */
     private void loadImageByType(String typeName) {
-        // Đường dẫn giờ sẽ được tạo động từ 'typeName'
         String imagePath = "/assets/" + typeName + ".png";
-
         try {
             this.image = new Image(getClass().getResource(imagePath).toExternalForm());
         } catch (NullPointerException e) {
-            // In ra lỗi rõ ràng hơn để bạn biết đang thiếu ảnh nào
             System.err.println("⚠ Lỗi: Không tìm thấy ảnh gạch: " + imagePath);
         }
     }
-    // <<< KẾT THÚC THAY ĐỔI >>>
 
-
-    // --- CÁC PHẦN SAU ĐÃ CHUẨN, GIỮ NGUYÊN ---
-
+    // --- CÁC HÀM GETTER/SETTER (Giữ nguyên) ---
     public int getHitPoints() {
         return hitPoints;
     }
-
     public void setHitPoints(int hitPoints) {
         this.hitPoints = hitPoints;
     }
-
     public String getType() {
         return type;
     }
-
     public void setType(String type) {
         this.type = type;
     }
 
+    // <<< HÀM NÀY ĐÃ ĐƯỢC VIẾT LẠI HOÀN TOÀN >>>
     /**
-     * Hàm takeHit() (Đã chuẩn, giữ nguyên)
-     * Gạch "unbreakable" (HP 999) sẽ không bao giờ bị phá hủy.
+     * Xử lý khi gạch bị va chạm.
+     * Giảm HP và chuyển loại (thay đổi ảnh) nếu là gạch thường.
+     * Vỡ ngay lập tức nếu là gạch power-up.
      */
-    public void takeHit() {
-        if (this.hitPoints > 0) {
-            this.hitPoints--; // Giảm HP
-
-            // Nếu là gạch "unbreakable" (HP giờ là 998), set lại 999
-            if (this.type.equals("unbreakable_brick")) {
-                this.hitPoints = 999;
-            }
+    public int takeHit() {
+        // 1. Xử lý gạch bất tử (loại 'g')
+        if (this.type.equals("unbreakable_brick")) {
+            this.hitPoints = 999; // Luôn giữ 999
+            return 0; // Không làm gì thêm
         }
+
+        // 2. Xử lý gạch Power-up (loại e, f, h) -> Vỡ ngay
+        if (this.type.equals("pink_brick") ||
+                this.type.equals("white_brick") ||
+                this.type.equals("doubleball_brick")) {
+
+            this.hitPoints = 0; // Vỡ ngay lập tức
+            return 50; // Không làm gì thêm
+        }
+
+        // 3. Xử lý gạch thường (a, b, c, d)
+        // Chỉ giảm HP nếu lớn hơn 0
+        if (this.hitPoints > 0) {
+            this.hitPoints--;
+        }
+
+        // 4. Kiểm tra xem gạch đã vỡ chưa
+        if (isDestroyed()) {
+            return 10; // Vỡ rồi, không cần chuyển loại
+        }
+
+        // 5. Logic chuyển loại gạch (d -> c -> b -> a)
+        // Nếu gạch chưa vỡ, nó sẽ đổi ảnh
+        switch (this.type) {
+            case "yellow_brick": // 'd' (HP từ 4 -> 3)
+                this.type = "green_brick"; // Chuyển thành 'c'
+                loadImageByType(this.type); // Tải ảnh mới (green)
+                break;
+            case "green_brick": // 'c' (HP từ 3 -> 2)
+                this.type = "red_brick"; // Chuyển thành 'b'
+                loadImageByType(this.type); // Tải ảnh mới (red)
+                break;
+            case "red_brick": // 'b' (HP từ 2 -> 1)
+                this.type = "blue_brick"; // Chuyển thành 'a'
+                loadImageByType(this.type); // Tải ảnh mới (blue)
+                break;
+            case "blue_brick": // 'a' (HP từ 1 -> 0)
+                // Đã vỡ, không cần làm gì
+                break;
+        }
+        return 10;
     }
+    // <<< KẾT THÚC HÀM VIẾT LẠI >>>
+
 
     /**
-     * Hàm isDestroyed() (Đã chuẩn, giữ nguyên)
+     * Hàm isDestroyed() (Giữ nguyên)
      */
     public boolean isDestroyed() {
         return hitPoints <= 0;
     }
 
     /**
-     * Hàm update() (Đã chuẩn, giữ nguyên)
+     * Hàm update() (Giữ nguyên)
      */
     @Override
     public void update() {
@@ -96,11 +119,11 @@ public class Brick extends GameObject {
     }
 
     /**
-     * Hàm render() (Đã chuẩn, giữ nguyên)
-     * Nó tự động kiểm tra !isDestroyed() nên gạch đã vỡ sẽ tàng hình.
+     * Hàm render() (Giữ nguyên)
      */
     @Override
     public void render(GraphicsContext gc) {
+        // Nó tự động kiểm tra !isDestroyed() nên gạch đã vỡ sẽ tàng hình.
         if (!isDestroyed()) {
             if (image != null) {
                 gc.drawImage(image, x, y, width, height);

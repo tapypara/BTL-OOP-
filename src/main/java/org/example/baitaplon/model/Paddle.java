@@ -5,7 +5,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 
 // <<< THÊM IMPORT CHO POWERUP (package con) >>>
-import org.example.baitaplon.powerup.PowerUp;
+import org.example.baitaplon.powerup.PowerUpManager;
 
 /**
  * Đại diện cho thanh đỡ (Paddle) do người chơi điều khiển.
@@ -15,7 +15,7 @@ import org.example.baitaplon.powerup.PowerUp;
 public class Paddle extends MovableObject {
 
     protected double speed;
-    protected PowerUp currentPowerUp; // Đã import
+    protected PowerUpManager currentPowerUpManager; // Đã import
     private double gameWidth;
     private Image image;
 
@@ -23,7 +23,7 @@ public class Paddle extends MovableObject {
         // ... (Code giữ nguyên) ...
         super(x, y, width, height);
         this.speed = speed;
-        this.currentPowerUp = null;
+        this.currentPowerUpManager = null;
         this.gameWidth = gameWidth;
         try {
             String imagePath = "/assets/paddle.png";
@@ -42,14 +42,14 @@ public class Paddle extends MovableObject {
         this.speed = speed;
     }
 
-    public PowerUp getCurrentPowerUp() {
+    public PowerUpManager getCurrentPowerUp() {
         // ... (Code giữ nguyên) ...
-        return currentPowerUp;
+        return currentPowerUpManager;
     }
 
-    public void setCurrentPowerUp(PowerUp currentPowerUp) {
+    public void setCurrentPowerUp(PowerUpManager currentPowerUpManager) {
         // ... (Code giữ nguyên) ...
-        this.currentPowerUp = currentPowerUp;
+        this.currentPowerUpManager = currentPowerUpManager;
     }
 
     public void moveLeft() {
@@ -67,7 +67,7 @@ public class Paddle extends MovableObject {
         setDx(0);
     }
 
-    public void applyPowerUp(PowerUp powerUp) {
+    public void applyPowerUp(PowerUpManager powerUpManager) {
         // ... (Code giữ nguyên) ...
     }
 

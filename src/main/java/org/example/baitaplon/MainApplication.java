@@ -11,6 +11,9 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import java.io.File;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -58,18 +61,15 @@ public class MainApplication extends Application implements PauseListener, MenuL
     // --- Trạng thái Game ---
     private boolean gameOver = false;
     // <<< ĐÃ XÓA BIẾN gameOverImage (không cần nữa) >>>
-
-    // --- Logic Âm thanh (ĐÃ BỎ PHẦN NHẠC) ---
     private boolean isSoundOn = true;
+    private MediaPlayer backgroundMusicPlayer;
 
     @Override
     public void start(Stage primaryStage) {
         this.stage = primaryStage;
         stage.setTitle("Arkanoid Game");
         stage.setResizable(false);
-
-        // (Không tải nhạc)
-
+        loadMusic();
         // --- Logic khởi tạo Menu ---
         menuScreen = new MenuScreen(this, isSoundOn);
         menuScene = new Scene(menuScreen, WIDTH, HEIGHT);
@@ -77,6 +77,26 @@ public class MainApplication extends Application implements PauseListener, MenuL
         // Hiển thị MenuScene ban đầu
         stage.setScene(menuScene);
         stage.show();
+
+        if (isSoundOn && backgroundMusicPlayer != null) {
+            backgroundMusicPlayer.play();
+        }
+    }
+
+    private void loadMusic() {
+        try {
+            // Đảm bảo file nhạc nằm trong thư mục /assets/
+            String musicFile = "/assets/background_music.mp3";
+            Media backgroundMusic = new Media(getClass().getResource(musicFile).toExternalForm());
+
+            backgroundMusicPlayer = new MediaPlayer(backgroundMusic);
+
+            // Đặt nhạc lặp lại vô tận
+            backgroundMusicPlayer.setCycleCount(MediaPlayer.INDEFINITE);
+
+        } catch (Exception e) {
+            System.err.println("⚠ Lỗi khi tải file nhạc: " + e.getMessage());
+        }
     }
 
     /**
@@ -94,6 +114,7 @@ public class MainApplication extends Application implements PauseListener, MenuL
         Platform.runLater(canvas::requestFocus);
 
         gameManager = new GameManager();
+        gameManager.setSoundEnabled(isSoundOn);
         gameOver = false; // Reset trạng thái game over
 
         // <<< ĐÃ XÓA LOGIC TẢI gameOverImage TẠI ĐÂY >>>
@@ -177,12 +198,12 @@ public class MainApplication extends Application implements PauseListener, MenuL
         }
     }
 
-    // --- LOGIC PAUSE (Không thay đổi) ---
     private void togglePause() {
         if (gameOver || gameManager == null) return;
         if (gameManager.isPaused()) resumeGame();
         else pauseGame();
     }
+
     private void pauseGame() {
         gameManager.pause();
         gameLoop.stop();
@@ -190,16 +211,23 @@ public class MainApplication extends Application implements PauseListener, MenuL
             pauseScreen = new PauseScreen(this);
         }
         gameRoot.getChildren().add(pauseScreen);
+        if (isSoundOn && backgroundMusicPlayer != null) {
+            backgroundMusicPlayer.pause();
+        }
     }
+
     private void resumeGame() {
         if (gameManager.isPaused()) {
             gameManager.resume();
             gameRoot.getChildren().remove(pauseScreen);
             gameLoop.start();
+
+            if (isSoundOn && backgroundMusicPlayer != null) {
+                backgroundMusicPlayer.play();
+            }
         }
     }
 
-    // --- THÊM HÀM MỚI: HIỂN THỊ GAME OVER ---
     /**
      * Dừng game và hiển thị màn hình Game Over.
      */
@@ -229,8 +257,26 @@ public class MainApplication extends Application implements PauseListener, MenuL
     }
 
     @Override
-    public void onToggleSound() { // (Từ MenuListener)
-        setSoundState(!isSoundOn);
+    public void onToggleSound() {
+        // Đảo ngược trạng thái
+        isSoundOn = !isSoundOn;
+
+        if (isSoundOn) {
+            // Nếu bật, thì phát nhạc
+            if (backgroundMusicPlayer != null) {
+                backgroundMusicPlayer.play();
+            }
+        } else {
+            // Nếu tắt, thì dừng nhạc
+            if (backgroundMusicPlayer != null) {
+                backgroundMusicPlayer.pause();
+            }
+        }
+
+        // Báo cho MenuScreen cập nhật lại hình ảnh nút sound on/off
+        if (menuScreen != null) {
+            menuScreen.updateSoundButtons(isSoundOn);
+        }
     }
 
     // <<< THAY ĐỔI 4: IMPLEMENT HÀM MỚI TỪ GameOverListener >>>
@@ -257,12 +303,6 @@ public class MainApplication extends Application implements PauseListener, MenuL
     /**
      * Cập nhật trạng thái âm thanh (CHỈ CẬP NHẬT UI).
      */
-    private void setSoundState(boolean on) {
-        isSoundOn = on;
-        if (menuScreen != null) {
-            menuScreen.updateSoundButtons(isSoundOn);
-        }
-    }
 
     // --- HÀM MAIN (Không thay đổi) ---
     public static void main(String[] args) {
