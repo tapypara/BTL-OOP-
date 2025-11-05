@@ -1,16 +1,9 @@
-module org.example.akranoid {
+module org.example.baitaplon {
     requires javafx.controls;
     requires javafx.fxml;
-    requires javafx.web;
 
     requires org.controlsfx.controls;
-    requires com.dlsc.formsfx;
-    requires net.synedra.validatorfx;
-    requires org.kordamp.ikonli.javafx;
-    requires org.kordamp.bootstrapfx.core;
-    requires eu.hansolo.tilesfx;
-    requires com.almasb.fxgl.all;
 
-    opens org.example.akranoid to javafx.fxml;
-    exports org.example.akranoid;
+    opens org.example.baitaplon to javafx.fxml;
+    exports org.example.baitaplon;
 }
