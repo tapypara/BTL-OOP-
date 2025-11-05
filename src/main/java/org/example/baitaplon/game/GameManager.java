@@ -12,13 +12,16 @@ import org.example.baitaplon.model.Brick;
 import org.example.baitaplon.model.Paddle;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-
+import javafx.scene.media.AudioClip;
 
 import org.example.baitaplon.stat.StatManager;
-import org.example.baitaplon.sound.SoundManager;
+
 
 public class GameManager {
     // ... (Code giữ nguyên) ...
+    private boolean soundEnabled = false; // Mặc định là tắt
+    private AudioClip paddleHitSound;
+    private AudioClip brickHitSound;
 
     public static final int SCREEN_WIDTH = 800;
     public static final int SCREEN_HEIGHT = 600;
@@ -37,7 +40,6 @@ public class GameManager {
     private static final int INITIAL_LIVES = 2;
 
     private StatManager statManager;
-    private SoundManager soundManager;
 
     public GameManager() {
         paddle = new Paddle(350, 550, 100, 20, 5.0, SCREEN_WIDTH);
@@ -53,7 +55,8 @@ public class GameManager {
 
         // <<< THAY THẾ KHỞI TẠO >>>
         this.statManager = new StatManager(INITIAL_LIVES);
-        this.soundManager = new SoundManager();
+
+        loadSounds();
         // <<< THAY THẾ createBricks() BẰNG loadLevel() >>>
         try {
             loadLevel(currentLevel); // Tải level đầu tiên
@@ -100,7 +103,7 @@ public class GameManager {
         // --- Hết VALIDATION ---
 
         int brickWidth = 80;
-        int brickHeight = 40;
+        int brickHeight = 45;
         final int INITIAL_Y = 50;
         final int ROWS = 7;
         final int COLS = 10;
@@ -194,9 +197,7 @@ public class GameManager {
     }
 
     public void setSoundEnabled(boolean enabled) {
-        if (soundManager != null) {
-            soundManager.setSoundEnabled(enabled);
-        }
+        this.soundEnabled = enabled;
     }
 
     public void updateGame() {
@@ -214,6 +215,19 @@ public class GameManager {
             }
         } else {
             // Không làm gì nếu game đã kết thúc
+        }
+    }
+
+    private void loadSounds() {
+        try {
+            String paddleSoundPath = "/assets/paddle_hit.wav";
+            String brickSoundPath = "/assets/brick_hit.wav";
+            paddleHitSound = new AudioClip(getClass().getResource(paddleSoundPath).toExternalForm());
+            brickHitSound = new AudioClip(getClass().getResource(brickSoundPath).toExternalForm());
+        } catch (Exception e) {
+            System.err.println("⚠ Lỗi khi tải file âm thanh (SFX): " + e.getMessage());
+            paddleHitSound = null;
+            brickHitSound = null;
         }
     }
 
@@ -249,10 +263,11 @@ public class GameManager {
         if (ball.checkCollision(paddle)) {
             if (ball.getDirectionY() > 0) {
                 ball.bounceOff(paddle);
-                soundManager.play("paddle_hit");
+                if (soundEnabled && paddleHitSound != null) {
+                    paddleHitSound.play();
+                }
             }
         }
-
 
         // Va chạm Gạch
         Iterator<Brick> brickIterator = bricks.iterator();
@@ -270,7 +285,9 @@ public class GameManager {
                 // <<< THAY ĐỔI: Gọi hàm addScore của StatManagement >>>
                 int points = brick.takeHit();
                 this.statManager.addScore(points);
-                soundManager.play("brick_hit");
+                if ( brickHitSound != null) {
+                    brickHitSound.play();
+                }
 
                 if (brick.isDestroyed()) {
                     // (Bạn sẽ thêm logic spawn power-up ở đây)
@@ -284,7 +301,7 @@ public class GameManager {
 
     public void renderGame(GraphicsContext gc) {
         // <<< THAY ĐỔI: Yêu cầu StatManager tự vẽ (cả điểm và mạng) >>>
-        this.statManager.render(gc);
+        this.statManager.render(gc, SCREEN_WIDTH, SCREEN_HEIGHT);
 
         paddle.render(gc);
         ball.render(gc);
@@ -307,4 +324,7 @@ public class GameManager {
         return this.statManager.getScore();
     }
 
+    public boolean isSoundEnabled() {
+        return soundEnabled;
+    }
 }
