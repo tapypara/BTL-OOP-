@@ -263,7 +263,7 @@ public class GameManager {
         if (ball.checkCollision(paddle)) {
             if (ball.getDirectionY() > 0) {
                 ball.bounceOff(paddle);
-                if (soundEnabled && paddleHitSound != null) {
+                if (paddleHitSound != null) {
                     paddleHitSound.play();
                 }
             }
