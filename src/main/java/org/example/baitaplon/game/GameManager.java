@@ -10,13 +10,19 @@ import java.util.List;
 import org.example.baitaplon.model.Ball;
 import org.example.baitaplon.model.Brick;
 import org.example.baitaplon.model.Paddle;
-
-// <<< THÊM IMPORT ĐỂ ĐỌC FILE >>>
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import javafx.scene.media.AudioClip;
+
+import org.example.baitaplon.stat.StatManager;
+
 
 public class GameManager {
     // ... (Code giữ nguyên) ...
+    private boolean soundEnabled = false; // Mặc định là tắt
+    private AudioClip paddleHitSound;
+    private AudioClip brickHitSound;
+
     public static final int SCREEN_WIDTH = 800;
     public static final int SCREEN_HEIGHT = 600;
 
@@ -26,11 +32,14 @@ public class GameManager {
     private boolean isGameOver;
     private boolean isPaused = false;
 
-    // --- THÊM CÁC BIẾN MỚI ĐỂ QUẢN LÝ LEVEL ---
     private int currentLevel;
     private static final int MAX_LEVEL = 5; // Ví dụ có 5 level
     private boolean isGameWon = false;
-    // ----------------------------------------
+
+    // <<< THÊM HẰNG SỐ MẠNG SỐNG >>>
+    private static final int INITIAL_LIVES = 2;
+
+    private StatManager statManager;
 
     public GameManager() {
         paddle = new Paddle(350, 550, 100, 20, 5.0, SCREEN_WIDTH);
@@ -44,6 +53,10 @@ public class GameManager {
         isGameWon = false;
         isPaused = false;
 
+        // <<< THAY THẾ KHỞI TẠO >>>
+        this.statManager = new StatManager(INITIAL_LIVES);
+
+        loadSounds();
         // <<< THAY THẾ createBricks() BẰNG loadLevel() >>>
         try {
             loadLevel(currentLevel); // Tải level đầu tiên
@@ -54,19 +67,7 @@ public class GameManager {
         }
     }
 
-    // <<< XÓA HOÀN TOÀN HÀM createBricks() >>>
-    /*
-    private void createBricks() {
-        // ... (Code cũ đã bị xóa) ...
-    }
-    */
-
-    // <<< HÀM MỚI: ĐỌC FILE LEVEL (THEO YÊU CẦU MỚI) >>>
-    /**
-     * Đọc file level (ví dụ /levels/level1.txt) và trả về nội dung
-     * sau khi đã lọc bỏ các ký tự xuống dòng và tab.
-     * Giữ lại dấu cách và dấu gạch dưới.
-     */
+    // ... (Các hàm readLevelFile và loadLevel giữ nguyên y hệt như file bạn gửi) ...
     private String readLevelFile(int levelNumber) {
         String filePath = "/levels/level" + levelNumber + ".txt";
         try (InputStream is = getClass().getResourceAsStream(filePath)) {
@@ -74,11 +75,7 @@ public class GameManager {
                 System.err.println("Lỗi: Không tìm thấy file: " + filePath);
                 return null;
             }
-            // Đọc toàn bộ file
             String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-
-            // CHỈ XÓA: newline (\n), carriage return (\r), tab (\t)
-            // GIỮ LẠI: dấu cách (' ') và mọi ký tự khác
             return content.replaceAll("[\\n\\r\\t]", "");
 
         } catch (Exception e) {
@@ -87,35 +84,27 @@ public class GameManager {
         }
     }
 
-    // <<< HÀM MỚI: TẠO GẠCH TỪ FILE (THEO YÊU CẦU MỚI) >>>
-    /**
-     * Tải gạch cho một level cụ thể từ file cấu hình.
-     * Ném ra Exception nếu file không hợp lệ.
-     */
     private void loadLevel(int levelNumber) throws Exception {
         bricks.clear();
-        ball.setStuck(true); // Reset bóng về paddle mỗi khi qua level
+        ball.setStuck(true);
 
-        String levelData = readLevelFile(levelNumber); // Gọi hàm đọc file (giữ nguyên)
+        String levelData = readLevelFile(levelNumber);
 
-        // --- VALIDATION (Giữ nguyên) ---
+        // --- VALIDATION ---
         if (levelData == null) {
             throw new Exception("File level " + levelNumber + " rỗng hoặc không tìm thấy.");
         }
         if (levelData.length() != 70) {
             throw new Exception("File level " + levelNumber + " không chứa đúng 70 ký tự (đã có " + levelData.length() + ").");
         }
-
-        // Cập nhật Regex để cho phép ký tự 'a' đến 'h'
         if (levelData.matches(".*[^a-h_ ].*")) {
             throw new Exception("File level " + levelNumber + " chứa ký tự không hợp lệ (chỉ cho phép a-h, _, và dấu cách).");
         }
         // --- Hết VALIDATION ---
 
-        // Giữ nguyên các thông số kích thước gạch
         int brickWidth = 80;
-        int brickHeight = 40;
-        final int INITIAL_Y = 10;
+        int brickHeight = 45;
+        final int INITIAL_Y = 50;
         final int ROWS = 7;
         final int COLS = 10;
 
@@ -127,55 +116,50 @@ public class GameManager {
                 char brickType = levelData.charAt(charIndex);
                 charIndex++;
 
-                // <<< THAY ĐỔI: CẬP NHẬT SWITCH CASE THEO MAPPING MỚI >>>
                 switch (brickType) {
-                    case 'a': // blue_brick.png
+                    case 'a': // blue_brick.png (1 HP)
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "blue_brick"));
                         break;
-                    case 'b': // red_brick.png
+                    case 'b': // red_brick.png (2 HP)
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 2, "red_brick"));
                         break;
-                    case 'c': // green_brick.png
+                    case 'c': // green_brick.png (3 HP)
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 3, "green_brick"));
                         break;
-                    case 'd': // yellow_brick.png (Giả sử là gạch 1 HP)
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "yellow_brick"));
+                    case 'd': // yellow_brick.png (4 HP)
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 4, "yellow_brick"));
                         break;
-                    case 'e': // pink_brick.png (Giả sử là gạch 1 HP)
+                    case 'e': // pink_brick.png
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "pink_brick"));
                         break;
-                    case 'f': // white_brick.png (Giả sử là gạch cứng 4 HP)
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 4, "white_brick"));
+                    case 'f': // white_brick.png
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "white_brick"));
                         break;
-                    case 'g': // unbreakable_brick.png (Bất tử)
-                        // Gán số HP cực lớn (ví dụ 999) để nó không bao giờ vỡ
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 999, "unbreakable_brick"));
-                        break;
-                    case 'h': // doubleball_brick.png (Power-up, 1 HP)
+                    case 'h': // doubleball_brick.png
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "doubleball_brick"));
                         break;
-                    case '_': // Gạch dưới là ô trống
-                    case ' ': // Dấu cách CŨNG là ô trống
-                        // Không làm gì cả, bỏ qua ô này
+                    case 'g': // unbreakable_brick.png (Bất tử)
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 999, "unbreakable_brick"));
+                        break;
+                    case '_':
+                    case ' ':
                         break;
                 }
             }
         }
     }
+    // ... (Kết thúc các hàm load level) ...
 
 
     public void pause() {
-        // ... (Code giữ nguyên) ...
         isPaused = true;
     }
 
     public void resume() {
-        // ... (Code giữ nguyên) ...
         isPaused = false;
     }
 
     public boolean isPaused() {
-        // ... (Code giữ nguyên) ...
         return isPaused;
     }
 
@@ -183,30 +167,19 @@ public class GameManager {
         return isGameOver;
     }
 
-    // <<< HÀM MỚI: Getter cho trạng thái thắng >>>
     public boolean isGameWon() {
         return isGameWon;
     }
 
-    // <<< HÀM MỚI: Kiểm tra xem tất cả gạch đã bị phá hủy chưa >>>
     private boolean areAllBricksCleared() {
-        // Nếu level không có gạch (chỉ toàn '_') thì cũng thắng
-        if (bricks.isEmpty()) {
-            return true;
-        }
-
         for (Brick brick : bricks) {
-            // Mọi gạch (a-h) đều có hitPoints > 0
             if (!brick.isDestroyed()) {
                 return false; // Còn gạch chưa vỡ
             }
         }
-
-        // Nếu vòng lặp kết thúc mà không 'return false'
         return true; // Tất cả gạch đã vỡ
     }
 
-    // <<< HÀM MỚI: Xử lý khi qua màn >>>
     private void goToNextLevel() {
         this.currentLevel++;
         if (this.currentLevel > MAX_LEVEL) {
@@ -218,185 +191,140 @@ public class GameManager {
                 loadLevel(this.currentLevel);
             } catch (Exception e) {
                 System.err.println("LỖI: Không thể tải level " + this.currentLevel + ": " + e.getMessage());
-                isGameOver = true; // Coi như thua nếu level tiếp theo bị lỗi
+                isGameOver = true;
             }
         }
     }
 
+    public void setSoundEnabled(boolean enabled) {
+        this.soundEnabled = enabled;
+    }
 
     public void updateGame() {
-        // ... (Code giữ nguyên) ...
         if (isPaused) {
             return;
         }
 
-        // <<< SỬA LẠI: Thêm check isGameWon >>>
         if (!isGameOver && !isGameWon) {
             paddle.update();
             ball.update();
-            checkCollisions();
+            checkCollisions(); // Logic Game Over/Trừ mạng đã được chuyển vào đây
 
-            // *** LOGIC MỚI ĐỂ CHUYỂN LEVEL ***
             if (areAllBricksCleared()) {
                 goToNextLevel();
             }
-            // *********************************
-
         } else {
-            // Nếu game over hoặc game won, chỉ update bóng
-            ball.update();
+            // Không làm gì nếu game đã kết thúc
+        }
+    }
+
+    private void loadSounds() {
+        try {
+            String paddleSoundPath = "/assets/paddle_hit.wav";
+            String brickSoundPath = "/assets/brick_hit.wav";
+            paddleHitSound = new AudioClip(getClass().getResource(paddleSoundPath).toExternalForm());
+            brickHitSound = new AudioClip(getClass().getResource(brickSoundPath).toExternalForm());
+        } catch (Exception e) {
+            System.err.println("⚠ Lỗi khi tải file âm thanh (SFX): " + e.getMessage());
+            paddleHitSound = null;
+            brickHitSound = null;
         }
     }
 
     private void checkCollisions() {
-        // ... (Code giữ nguyên) ...
+        // Va chạm tường
         if (ball.getX() <= 0 || ball.getX() + ball.getWidth() >= SCREEN_WIDTH) {
             ball.setDirectionX(-ball.getDirectionX());
         }
         if (ball.getY() <= 0) {
             ball.setDirectionY(-ball.getDirectionY());
         }
+
+        // <<< THAY ĐỔI: LOGIC KHI BÓNG RƠI XUỐNG ĐÁY >>>
         if (ball.getY() + ball.getHeight() >= SCREEN_HEIGHT) {
             if (!isGameOver && !isGameWon) { // Thêm check isGameWon
-                System.out.println("Game Over!");
-                isGameOver = true;
+
+                // 1. Trừ 1 mạng
+                this.statManager.loseLife();
+
+                // 2. Kiểm tra xem hết mạng chưa
+                if (this.statManager.isOutOfLives()) {
+                    System.out.println("Game Over!");
+                    isGameOver = true; // Hết mạng -> Chính thức Game Over
+                } else {
+                    // 3. Nếu còn mạng, reset bóng
+                    ball.setStuck(true);
+                }
             }
         }
+        // <<< KẾT THÚC THAY ĐỔI >>>
+
+        // Va chạm Paddle
         if (ball.checkCollision(paddle)) {
             if (ball.getDirectionY() > 0) {
                 ball.bounceOff(paddle);
-            }
-        }
-        Iterator<Brick> brickIterator = bricks.iterator();
-        while (brickIterator.hasNext()) {
-            Brick brick = brickIterator.next();
-            if (brick.isDestroyed()) continue;
-            if (ball.checkCollision(brick)) {
-                ball.bounceOff(brick);
-                brick.takeHit();
-                if (brick.isDestroyed()) {
-                    // brickIterator.remove(); // <<< TẠM THỜI KHÔNG XÓA ĐỂ `areAllBricksCleared` HOẠT ĐỘNG
-                    // Tốt hơn là `areAllBricksCleared` nên check `!brick.isDestroyed()`
-                    // Giữ nguyên `brickIterator.remove()` là đúng
+                if (paddleHitSound != null) {
+                    paddleHitSound.play();
                 }
-                break;
             }
         }
 
-        // <<< LƯU Ý QUAN TRỌNG VỀ LOGIC CHUYỂN LEVEL >>>
-        // Nếu bạn `brickIterator.remove()` thì `bricks.isEmpty()` sẽ được kích hoạt
-        // để qua màn. Chúng ta cần sửa lại `areAllBricksCleared`
-
-        // <<< SỬA LẠI: areAllBricksCleared (Cách 2) >>>
-        // Chúng ta nên giữ lại gạch đã vỡ trong list, chỉ là không render
-        // và không check va chạm.
-        // NHƯNG code hiện tại của bạn đang `remove()`.
-
-        // <<< SỬA LẠI `checkCollisions` VÀ `areAllBricksCleared` ĐỂ NHẤT QUÁN >>>
-        /* * Để `areAllBricksCleared` hoạt động đúng với `brickIterator.remove()`,
-         * hàm `areAllBricksCleared` phải check `bricks.isEmpty()`
-         */
-
-        // <<< SỬA LẠI areAllBricksCleared() (Cách 3 - Tốt nhất) >>>
-        /* * Chúng ta không dùng `areAllBricksCleared` nữa,
-         * mà check `bricks.isEmpty()` ngay trong `updateGame`
-         */
-    }
-
-    // <<< THAY ĐỔI CUỐI CÙNG ĐỂ ĐẢM BẢO LOGIC HOẠT ĐỘNG >>>
-    /*
-     * Vấn đề: `checkCollisions` XÓA gạch (remove).
-     * Hàm `areAllBricksCleared` của tôi lại LẶP QUA list gạch.
-     * Cách đúng: `areAllBricksCleared` phải đếm số gạch "chưa bị phá hủy".
-     * * Chúng ta sẽ giữ nguyên `areAllBricksCleared` như tôi viết ở trên,
-     * nhưng `checkCollisions` PHẢI DỪNG VIỆC `remove()`.
-     * * Thay vào đó, chúng ta sẽ chỉ `remove()` khi `brick.isDestroyed()`
-     * trong hàm `renderGame` hoặc đầu `checkCollisions`.
-     * * ĐỂ ĐƠN GIẢN, chúng ta sẽ làm lại `checkCollisions` và `areAllBricksCleared`
-     * như sau:
-     */
-
-    /* * Sửa lại `checkCollisions` (Không `remove` nữa)
-
+        // Va chạm Gạch
         Iterator<Brick> brickIterator = bricks.iterator();
         while (brickIterator.hasNext()) {
             Brick brick = brickIterator.next();
-            if (brick.isDestroyed()) continue; // Bỏ qua gạch đã vỡ
+
+            // Bỏ qua gạch đã vỡ
+            if (brick.isDestroyed()) {
+                continue;
+            }
+
             if (ball.checkCollision(brick)) {
                 ball.bounceOff(brick);
-                brick.takeHit(); // Hàm này đặt isDestroyed = true nếu hết máu
-                // KHÔNG REMOVE NỮA
-                break;
-            }
-        }
-    */
 
-    /* * Và `areAllBricksCleared` (Giữ nguyên như tôi viết) là đúng
+                // <<< THAY ĐỔI: Gọi hàm addScore của StatManagement >>>
+                int points = brick.takeHit();
+                this.statManager.addScore(points);
+                if ( brickHitSound != null) {
+                    brickHitSound.play();
+                }
 
-    private boolean areAllBricksCleared() {
-        for (Brick brick : bricks) {
-            if (!brick.isDestroyed()) {
-                return false; // Còn gạch chưa vỡ
-            }
-        }
-        return true; // Tất cả gạch đã vỡ (hoặc list rỗng)
-    }
-    */
+                if (brick.isDestroyed()) {
+                    // (Bạn sẽ thêm logic spawn power-up ở đây)
+                }
 
-    /* * VÀ `renderGame` PHẢI KIỂM TRA `!isDestroyed()` (file Brick.java của bạn đã làm vậy)
-     * VẬY LÀ TỐT RỒI.
-     * * CHỈ CẦN BỎ `brickIterator.remove();` trong `checkCollisions`
-     */
-
-    // <<< FILE CUỐI CÙNG SẼ TRÔNG NHƯ NÀY >>>
-
-     /*
-     private void checkCollisions() {
-        // ... (code va chạm tường và paddle giữ nguyên) ...
-
-        // Logic va chạm gạch
-        Iterator<Brick> brickIterator = bricks.iterator();
-        while (brickIterator.hasNext()) {
-            Brick brick = brickIterator.next();
-            if (brick.isDestroyed()) continue; // Bỏ qua nếu đã vỡ
-            if (ball.checkCollision(brick)) {
-                ball.bounceOff(brick);
-                brick.takeHit(); // Chỉ gọi takeHit()
-                // BỎ DÒNG: brickIterator.remove();
+                // Logic đã chuẩn: Không xóa gạch, chỉ break
                 break;
             }
         }
     }
-    */
-
-    /*
-     * KHOAN ĐÃ, file Brick.java của bạn có hàm render:
-     * * public void render(GraphicsContext gc) {
-     * if (!isDestroyed()) { // <--- TỐT
-     * // ... vẽ ...
-     * }
-     * }
-     * * Vậy chúng ta chỉ cần BỎ DÒNG `brickIterator.remove();` trong `checkCollisions`
-     * là mọi thứ sẽ hoạt động.
-     */
-
 
     public void renderGame(GraphicsContext gc) {
-        // ... (Code giữ nguyên) ...
+        // <<< THAY ĐỔI: Yêu cầu StatManager tự vẽ (cả điểm và mạng) >>>
+        this.statManager.render(gc, SCREEN_WIDTH, SCREEN_HEIGHT);
+
         paddle.render(gc);
         ball.render(gc);
         for (Brick brick : bricks) {
             brick.render(gc); // File Brick.java đã tự check !isDestroyed()
         }
+        // (Đây là nơi bạn sẽ vẽ PowerUp)
     }
 
     public Paddle getPaddle() {
-        // ... (Code giữ nguyên) ...
         return paddle;
     }
 
     public Ball getBall() {
-        // ... (Code giữ nguyên) ...
         return ball;
+    }
+
+    // <<< THAY ĐỔI: getScore() giờ gọi từ statManager >>>
+    public int getScore() {
+        return this.statManager.getScore();
+    }
+
+    public boolean isSoundEnabled() {
+        return soundEnabled;
     }
 }
