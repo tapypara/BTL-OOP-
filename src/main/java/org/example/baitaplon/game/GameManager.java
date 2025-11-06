@@ -3,13 +3,15 @@ package org.example.baitaplon.game;
 
 import javafx.scene.canvas.GraphicsContext;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 // <<< THÊM IMPORT CHO CÁC LỚP MODEL >>>
 import org.example.baitaplon.model.Ball;
 import org.example.baitaplon.model.Brick;
 import org.example.baitaplon.model.Paddle;
+// <<< THÊM IMPORT CHO POWERUP >>>
+import org.example.baitaplon.powerup.PowerUp;
+
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import javafx.scene.media.AudioClip;
@@ -26,14 +28,15 @@ public class GameManager {
     public static final int SCREEN_WIDTH = 800;
     public static final int SCREEN_HEIGHT = 600;
 
-    private Paddle paddle; // Đã import
-    private Ball ball;     // Đã import
-    private List<Brick> bricks; // Đã import
+    private Paddle paddle;
+    private Ball ball;
+    private List<Brick> bricks;
+    private List<PowerUp> powerUps; // <<< THÊM MỚI: Danh sách PowerUp >>>
     private boolean isGameOver;
     private boolean isPaused = false;
 
     private int currentLevel;
-    private static final int MAX_LEVEL = 5; // Ví dụ có 5 level
+    private static final int MAX_LEVEL = 5;
     private boolean isGameWon = false;
 
     // <<< THÊM HẰNG SỐ MẠNG SỐNG >>>
@@ -48,21 +51,19 @@ public class GameManager {
         ball.setStuck(true);
 
         bricks = new ArrayList<>();
-        currentLevel = 1; // Bắt đầu từ level 1
+        this.powerUps = new ArrayList<>(); // <<< THÊM MỚI: Khởi tạo danh sách >>>
+        currentLevel = 1;
         isGameOver = false;
         isGameWon = false;
         isPaused = false;
 
-        // <<< THAY THẾ KHỞI TẠO >>>
         this.statManager = new StatManager(INITIAL_LIVES);
-
         loadSounds();
-        // <<< THAY THẾ createBricks() BẰNG loadLevel() >>>
+
         try {
             loadLevel(currentLevel); // Tải level đầu tiên
         } catch (Exception e) {
             System.err.println("LỖI NGHIÊM TRỌNG: Không thể tải level " + currentLevel + ": " + e.getMessage());
-            // Nếu không tải được level, coi như game over ngay
             isGameOver = true;
         }
     }
@@ -86,6 +87,7 @@ public class GameManager {
 
     private void loadLevel(int levelNumber) throws Exception {
         bricks.clear();
+        this.powerUps.clear(); // <<< THÊM MỚI: Xóa powerup cũ khi qua level mới >>>
         ball.setStuck(true);
 
         String levelData = readLevelFile(levelNumber);
@@ -97,13 +99,13 @@ public class GameManager {
         if (levelData.length() != 70) {
             throw new Exception("File level " + levelNumber + " không chứa đúng 70 ký tự (đã có " + levelData.length() + ").");
         }
-        if (levelData.matches(".*[^a-h_ ].*")) {
+        if (levelData.matches(".*[^a-i_ ].*")) {
             throw new Exception("File level " + levelNumber + " chứa ký tự không hợp lệ (chỉ cho phép a-h, _, và dấu cách).");
         }
         // --- Hết VALIDATION ---
 
         int brickWidth = 80;
-        int brickHeight = 45;
+        int brickHeight = 40;
         final int INITIAL_Y = 50;
         final int ROWS = 7;
         final int COLS = 10;
@@ -129,17 +131,20 @@ public class GameManager {
                     case 'd': // yellow_brick.png (4 HP)
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 4, "yellow_brick"));
                         break;
-                    case 'e': // pink_brick.png
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "pink_brick"));
+                    case 'e': // pink_brick.png (Sẽ spawn "addlife")
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "speedup_brick"));
                         break;
-                    case 'f': // white_brick.png
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "white_brick"));
+                    case 'f': // white_brick.png (Sẽ spawn "speedup")
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "speeddown_brick"));
                         break;
-                    case 'h': // doubleball_brick.png
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "doubleball_brick"));
+                    case 'h': // doubleball_brick.png (Sẽ spawn "upsidepaddle")
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "upsidepaddle_brick"));
                         break;
                     case 'g': // unbreakable_brick.png (Bất tử)
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 999, "unbreakable_brick"));
+                        break;
+                    case 'i': // doubleball_brick.png (Sẽ spawn "upsidepaddle")
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "bomb_brick"));
                         break;
                     case '_':
                     case ' ':
@@ -173,11 +178,11 @@ public class GameManager {
 
     private boolean areAllBricksCleared() {
         for (Brick brick : bricks) {
-            if (!brick.isDestroyed()) {
+            if (!brick.isDestroyed() && !brick.getType().equals("unbreakable_brick")) {
                 return false; // Còn gạch chưa vỡ
             }
         }
-        return true; // Tất cả gạch đã vỡ
+        return true;
     }
 
     private void goToNextLevel() {
@@ -208,13 +213,37 @@ public class GameManager {
         if (!isGameOver && !isGameWon) {
             paddle.update();
             ball.update();
-            checkCollisions(); // Logic Game Over/Trừ mạng đã được chuyển vào đây
 
+
+            // SỬA BÊN TRONG VÒNG LẶP NÀY
+            for (int i = 0; i < powerUps.size(); i++) {
+                PowerUp powerUp = powerUps.get(i);
+                powerUp.update(); // 1. Cho power-up rơi
+
+                // --- ⛔ BẠN BỊ THIẾU 3 DÒNG NÀY ⛔ ---
+                // 2. KIỂM TRA VA CHẠM VỚI PADDLE
+                // Kiểm tra xem power-up còn sống VÀ có va chạm paddle không
+                if (powerUp.isAlive() && powerUp.checkCollision(paddle)) {
+                    // 3. NẾU CÓ, KÍCH HOẠT NÓ
+                    powerUp.activate(this); // "this" chính là GameManager
+                }
+                // --------------------------------------
+
+                // 4. DỌN DẸP (Code này của bạn đã đúng)
+                // (Nó sẽ xóa power-up nếu nó rơi ra ngoài HOẶC vừa được kích hoạt)
+                if (!powerUp.isAlive()) {
+                    powerUps.remove(i);
+                    i--;
+                }
+            }
+            // --- KẾT THÚC SỬA ---
+
+            checkCollisions();
             if (areAllBricksCleared()) {
                 goToNextLevel();
             }
         } else {
-            // Không làm gì nếu game đã kết thúc
+            return;
         }
     }
 
@@ -240,76 +269,74 @@ public class GameManager {
             ball.setDirectionY(-ball.getDirectionY());
         }
 
-        // <<< THAY ĐỔI: LOGIC KHI BÓNG RƠI XUỐNG ĐÁY >>>
+        // Va chạm bóng rơi xuống đáy
         if (ball.getY() + ball.getHeight() >= SCREEN_HEIGHT) {
-            if (!isGameOver && !isGameWon) { // Thêm check isGameWon
-
-                // 1. Trừ 1 mạng
+            if (!isGameOver && !isGameWon) {
                 this.statManager.loseLife();
-
-                // 2. Kiểm tra xem hết mạng chưa
                 if (this.statManager.isOutOfLives()) {
                     System.out.println("Game Over!");
-                    isGameOver = true; // Hết mạng -> Chính thức Game Over
+                    isGameOver = true;
                 } else {
-                    // 3. Nếu còn mạng, reset bóng
                     ball.setStuck(true);
                 }
             }
         }
-        // <<< KẾT THÚC THAY ĐỔI >>>
 
         // Va chạm Paddle
         if (ball.checkCollision(paddle)) {
             if (ball.getDirectionY() > 0) {
                 ball.bounceOff(paddle);
-                if (paddleHitSound != null) {
+                if (soundEnabled && paddleHitSound != null) {
                     paddleHitSound.play();
                 }
             }
         }
 
-        // Va chạm Gạch
-        Iterator<Brick> brickIterator = bricks.iterator();
-        while (brickIterator.hasNext()) {
-            Brick brick = brickIterator.next();
-
-            // Bỏ qua gạch đã vỡ
+        // Va chạm Gạch (Dùng for-each)
+        // <<< LƯU Ý: Tôi đã xóa vòng lặp for-i bị trùng lặp của bạn ở dưới >>>
+        for (Brick brick : bricks) {
             if (brick.isDestroyed()) {
                 continue;
             }
-
             if (ball.checkCollision(brick)) {
                 ball.bounceOff(brick);
 
-                // <<< THAY ĐỔI: Gọi hàm addScore của StatManagement >>>
-                int points = brick.takeHit();
+                int points = brick.takeHit(this);
                 this.statManager.addScore(points);
-                if ( brickHitSound != null) {
+                if (brickHitSound != null) {
                     brickHitSound.play();
                 }
-
-                if (brick.isDestroyed()) {
-                    // (Bạn sẽ thêm logic spawn power-up ở đây)
-                }
-
-                // Logic đã chuẩn: Không xóa gạch, chỉ break
                 break;
             }
         }
+
+    }
+
+    /**
+     * <<< THÊM MỚI: Hàm tạo PowerUp >>>
+     * Tạo ra một PowerUp dựa trên loại gạch (Brick) vừa bị phá hủy.
+     * GIẢ ĐỊNH: Class Brick của bạn phải có hàm getBrickTypeName()
+     */
+    private void spawnPowerUp(Brick brick) {
+
     }
 
     public void renderGame(GraphicsContext gc) {
-        // <<< THAY ĐỔI: Yêu cầu StatManager tự vẽ (cả điểm và mạng) >>>
         this.statManager.render(gc, SCREEN_WIDTH, SCREEN_HEIGHT);
 
         paddle.render(gc);
         ball.render(gc);
         for (Brick brick : bricks) {
-            brick.render(gc); // File Brick.java đã tự check !isDestroyed()
+            brick.render(gc);
         }
-        // (Đây là nơi bạn sẽ vẽ PowerUp)
+
+        // <<< THÊM MỚI: Vẽ tất cả PowerUp >>>
+        for (PowerUp powerUp : powerUps) {
+            powerUp.render(gc); // PowerUp.java sẽ tự kiểm tra isAlive
+        }
     }
+
+    // ... (Các hàm getters giữ nguyên) ...
 
     public Paddle getPaddle() {
         return paddle;
@@ -319,12 +346,23 @@ public class GameManager {
         return ball;
     }
 
-    // <<< THAY ĐỔI: getScore() giờ gọi từ statManager >>>
     public int getScore() {
         return this.statManager.getScore();
     }
 
     public boolean isSoundEnabled() {
         return soundEnabled;
+    }
+
+    public StatManager getStatManager() {
+        return statManager;
+    }
+
+    public List<Brick> getBricks() {
+        return bricks;
+    }
+
+    public List<PowerUp> getPowerUps() {
+        return powerUps;
     }
 }
