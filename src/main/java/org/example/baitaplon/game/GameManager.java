@@ -287,11 +287,8 @@ public class GameManager {
 
         // 3. Va chạm với Thanh đỡ (Paddle)
         if (ball.checkCollision(paddle)) {
-            // Chỉ nảy lên nếu bóng đang đi xuống (tránh lỗi kẹt bóng)
-            if (ball.getDirectionY() > 0) {
                 ball.bounceOff(paddle);
                 SoundManager.getInstance().playPaddleHit(); // Phát âm thanh
-            }
         }
 
         // 4. Va chạm với Gạch (Bricks)
