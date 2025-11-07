@@ -1,133 +1,111 @@
 package org.example.baitaplon;
 
+import java.util.HashSet;
+import java.util.Set;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
-import java.io.File;
-
-import java.util.HashSet;
-import java.util.Set;
-
-// --- THÊM CÁC IMPORT CHO CÁC PACKAGE MỚI ---
 import org.example.baitaplon.game.GameManager;
 import org.example.baitaplon.model.Ball;
 import org.example.baitaplon.model.Paddle;
+import org.example.baitaplon.sound.SoundManager;
+import org.example.baitaplon.ui.GameOverListener;
+import org.example.baitaplon.ui.GameOverScreen;
 import org.example.baitaplon.ui.MenuListener;
 import org.example.baitaplon.ui.MenuScreen;
 import org.example.baitaplon.ui.PauseListener;
 import org.example.baitaplon.ui.PauseScreen;
-// <<< THAY ĐỔI 1: THÊM IMPORT MỚI >>>
-import org.example.baitaplon.ui.GameOverListener;
-import org.example.baitaplon.ui.GameOverScreen;
 
 /**
- * Lớp Application chính, đóng vai trò là "Controller".
- * Implement cả 3 Listener.
+ * Lớp Application chính (điểm vào của JavaFX), đóng vai trò là "Controller" trung tâm.
+ * Lớp này quản lý các màn hình (Scene), vòng lặp game chính (AnimationTimer)
+ * và xử lý giao tiếp giữa các thành phần UI (View) và logic game (Model/GameManager).
+ *
+ * Lớp này implement 3 Listener để nhận "callback" từ các màn hình UI.
  */
-// <<< THAY ĐỔI 2: IMPLEMENT THÊM GameOverListener >>>
-public class MainApplication extends Application implements PauseListener, MenuListener, GameOverListener {
+public class MainApplication extends Application implements PauseListener, MenuListener,
+        GameOverListener {
 
-    // --- Hằng số ---
+    // --- Hằng số (Lấy từ GameManager) ---
     private static final int WIDTH = GameManager.SCREEN_WIDTH;
     private static final int HEIGHT = GameManager.SCREEN_HEIGHT;
 
     // --- Quản lý cửa sổ & Scene ---
-    private Stage stage;
-    private Scene menuScene;
-    private Scene gameScene;
-    private StackPane gameRoot;
+    private Stage stage;        // Cửa sổ chính của ứng dụng
+    private Scene menuScene;    // Màn hình Menu
+    private Scene gameScene;    // Màn hình chơi game
+    private StackPane gameRoot; // Pane gốc của gameScene (chứa Canvas và các UI đè lên)
 
-    // --- Các thành phần UI (được tách riêng) ---
+    // --- Các thành phần UI (View) ---
     private MenuScreen menuScreen;
     private PauseScreen pauseScreen;
-    private GameOverScreen gameOverScreen; // <<< THÊM BIẾN MỚI
+    private GameOverScreen gameOverScreen;
 
     // --- Logic Game ---
-    private GameManager gameManager;
-    private AnimationTimer gameLoop;
-    private GraphicsContext gc;
-    private final Set<KeyCode> activeKeys = new HashSet<>();
+    private GameManager gameManager;    // Trái tim logic của game
+    private AnimationTimer gameLoop;  // Vòng lặp chính (60 FPS)
+    private GraphicsContext gc;         // Bút vẽ cho Canvas
+    private final Set<KeyCode> activeKeys = new HashSet<>(); // Giữ phím đang nhấn
 
     // --- Trạng thái Game ---
     private boolean gameOver = false;
-    // <<< ĐÃ XÓA BIẾN gameOverImage (không cần nữa) >>>
-    private boolean isSoundOn = true;
-    private MediaPlayer backgroundMusicPlayer;
 
     @Override
     public void start(Stage primaryStage) {
         this.stage = primaryStage;
         stage.setTitle("Arkanoid Game");
         stage.setResizable(false);
-        loadMusic();
-        // --- Logic khởi tạo Menu ---
-        menuScreen = new MenuScreen(this, isSoundOn);
+
+        // --- Khởi tạo Menu ---
+        // Lấy trạng thái âm thanh ban đầu từ SoundManager
+        menuScreen = new MenuScreen(this, SoundManager.getInstance().isMusicOn());
         menuScene = new Scene(menuScreen, WIDTH, HEIGHT);
 
         // Hiển thị MenuScene ban đầu
         stage.setScene(menuScene);
         stage.show();
 
-        if (isSoundOn && backgroundMusicPlayer != null) {
-            backgroundMusicPlayer.play();
-        }
-    }
-
-    private void loadMusic() {
-        try {
-            // Đảm bảo file nhạc nằm trong thư mục /assets/
-            String musicFile = "/assets/background_music.mp3";
-            Media backgroundMusic = new Media(getClass().getResource(musicFile).toExternalForm());
-
-            backgroundMusicPlayer = new MediaPlayer(backgroundMusic);
-
-            // Đặt nhạc lặp lại vô tận
-            backgroundMusicPlayer.setCycleCount(MediaPlayer.INDEFINITE);
-
-        } catch (Exception e) {
-            System.err.println("⚠ Lỗi khi tải file nhạc: " + e.getMessage());
-        }
+        // Yêu cầu SoundManager phát nhạc (nếu đang bật)
+        SoundManager.getInstance().playMusic();
     }
 
     /**
-     * Bắt đầu màn chơi (được gọi bởi MenuScreen).
+     * Bắt đầu màn chơi (được gọi bởi MenuScreen thông qua onStartGame()).
      */
     private void startGame() {
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         gc = canvas.getGraphicsContext2D();
+        // Dùng StackPane để có thể xếp chồng PauseScreen/GameOverScreen lên Canvas
         gameRoot = new StackPane(canvas);
         gameScene = new Scene(gameRoot, WIDTH, HEIGHT);
 
-        setupKeyListeners();
+        setupKeyListeners(); // Gán sự kiện phím cho gameScene
 
         stage.setScene(gameScene);
-        Platform.runLater(canvas::requestFocus);
+        Platform.runLater(canvas::requestFocus); // Đảm bảo Canvas nhận được input phím
 
-        gameManager = new GameManager();
-        gameManager.setSoundEnabled(isSoundOn);
+        gameManager = new GameManager(); // Tạo một phiên game mới
         gameOver = false; // Reset trạng thái game over
 
-        // <<< ĐÃ XÓA LOGIC TẢI gameOverImage TẠI ĐÂY >>>
-
-        startGameLoop();
+        startGameLoop(); // Bắt đầu vòng lặp game
     }
 
+    /**
+     * Cài đặt lắng nghe sự kiện nhấn/thả phím cho màn hình chơi game.
+     */
     private void setupKeyListeners() {
         gameScene.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
-                togglePause();
+                togglePause(); // Xử lý Pause riêng
             } else {
-                activeKeys.add(event.getCode());
+                activeKeys.add(event.getCode()); // Thêm phím vào bộ đệm
             }
         });
         gameScene.setOnKeyReleased(event -> activeKeys.remove(event.getCode()));
@@ -140,24 +118,25 @@ public class MainApplication extends Application implements PauseListener, MenuL
         gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                // Nếu game đã over, không làm gì cả (chờ người dùng click)
-                if (gameOver) return;
+                if (gameOver) {
+                    return;
+                }
 
-                // Xử lý input
+                // 1. Xử lý Input
                 handleGameInput();
 
-                // Cập nhật logic game
+                // 2. Cập nhật Logic
                 if (gameManager != null) {
                     gameManager.updateGame();
                 }
 
-                // Vẽ game
+                // 3. Vẽ (Render)
                 renderGame();
 
-                // <<< THAY ĐỔI 3: KIỂM TRA GAME OVER SAU KHI VẼ XONG >>>
+                // 4. Kiểm tra trạng thái Game Over
                 if (gameManager != null && gameManager.isGameOver()) {
-                    gameOver = true; // Đặt cờ
-                    showGameOverScreen(); // Hiển thị màn hình Game Over
+                    gameOver = true;
+                    showGameOverScreen();
                 }
             }
         };
@@ -165,17 +144,28 @@ public class MainApplication extends Application implements PauseListener, MenuL
     }
 
     /**
-     * Xử lý input của người chơi trong vòng lặp game.
+     * Xử lý input của người chơi (được gọi trong vòng lặp game).
      */
     private void handleGameInput() {
-        // ... (Code này giữ nguyên) ...
-        if (gameManager == null) return;
+        if (gameManager == null) {
+            return;
+        }
         Paddle paddle = gameManager.getPaddle();
         Ball ball = gameManager.getBall();
-        if (paddle == null || ball == null) return;
-        if (activeKeys.contains(KeyCode.LEFT)) paddle.moveLeft();
-        else if (activeKeys.contains(KeyCode.RIGHT)) paddle.moveRight();
-        else paddle.stop();
+        if (paddle == null || ball == null) {
+            return;
+        }
+
+        // Di chuyển thanh đỡ
+        if (activeKeys.contains(KeyCode.LEFT)) {
+            paddle.moveLeft();
+        } else if (activeKeys.contains(KeyCode.RIGHT)) {
+            paddle.moveRight();
+        } else {
+            paddle.stop();
+        }
+
+        // Bắn bóng
         if (ball.isStuck() && activeKeys.contains(KeyCode.SPACE)) {
             ball.setDirectionY(-Math.abs(ball.getDirectionY()));
             ball.setStuck(false);
@@ -183,48 +173,57 @@ public class MainApplication extends Application implements PauseListener, MenuL
     }
 
     /**
-     * Vẽ game lên Canvas.
+     * Render game lên Canvas (được gọi trong vòng lặp game).
      */
     private void renderGame() {
-        // <<< ĐÃ XÓA KHỐI `if (gameOver)` Ở ĐẦU HÀM NÀY >>>
-
-        // 1. Xóa màn hình (vẽ nền)
+        // Xóa màn hình (vẽ nền)
         gc.setFill(Color.DARKSLATEGRAY);
         gc.fillRect(0, 0, WIDTH, HEIGHT);
 
-        // 2. Yêu cầu GameManager vẽ các đối tượng
+        // Yêu cầu GameManager vẽ các đối tượng
         if (gameManager != null) {
             gameManager.renderGame(gc);
         }
     }
 
+    /**
+     * Bật/Tắt trạng thái Tạm dừng (Pause).
+     */
     private void togglePause() {
-        if (gameOver || gameManager == null) return;
-        if (gameManager.isPaused()) resumeGame();
-        else pauseGame();
+        if (gameOver || gameManager == null) {
+            return; // Không thể pause khi đã game over
+        }
+        if (gameManager.isPaused()) {
+            resumeGame();
+        } else {
+            pauseGame();
+        }
     }
 
+    /**
+     * Kích hoạt trạng thái Tạm dừng.
+     */
     private void pauseGame() {
         gameManager.pause();
-        gameLoop.stop();
+        gameLoop.stop(); // Dừng vòng lặp game
         if (pauseScreen == null) {
-            pauseScreen = new PauseScreen(this);
+            pauseScreen = new PauseScreen(this); // 'this' là PauseListener
         }
-        gameRoot.getChildren().add(pauseScreen);
-        if (isSoundOn && backgroundMusicPlayer != null) {
-            backgroundMusicPlayer.pause();
-        }
+        gameRoot.getChildren().add(pauseScreen); // Thêm màn hình pause lên trên Canvas
+
+        SoundManager.getInstance().pauseMusic(); // Tạm dừng nhạc
     }
 
+    /**
+     * Thoát khỏi trạng thái Tạm dừng.
+     */
     private void resumeGame() {
         if (gameManager.isPaused()) {
             gameManager.resume();
-            gameRoot.getChildren().remove(pauseScreen);
-            gameLoop.start();
+            gameRoot.getChildren().remove(pauseScreen); // Gỡ màn hình pause
+            gameLoop.start(); // Tiếp tục vòng lặp game
 
-            if (isSoundOn && backgroundMusicPlayer != null) {
-                backgroundMusicPlayer.play();
-            }
+            SoundManager.getInstance().playMusic(); // Phát tiếp nhạc
         }
     }
 
@@ -236,75 +235,72 @@ public class MainApplication extends Application implements PauseListener, MenuL
         if (gameOverScreen == null) {
             gameOverScreen = new GameOverScreen(this); // 'this' là GameOverListener
         }
-        gameRoot.getChildren().add(gameOverScreen); // Thêm màn hình lên trên
+        gameRoot.getChildren().add(gameOverScreen); // Thêm màn hình game over lên trên Canvas
     }
 
-    // --- IMPLEMENTS CÁC HÀM LISTENER ---
+    // --- TRIỂN KHAI CÁC HÀM TỪ INTERFACE (LISTENER) ---
 
+    /**
+     * (Từ PauseListener) Được gọi khi nhấn nút "Resume" trên PauseScreen.
+     */
     @Override
-    public void onResume() { // (Từ PauseListener)
+    public void onResume() {
         resumeGame();
     }
 
+    /**
+     * (Từ MenuListener) Được gọi khi nhấn nút "Start" trên MenuScreen.
+     */
     @Override
-    public void onStartGame() { // (Từ MenuListener)
+    public void onStartGame() {
         startGame();
     }
 
+    /**
+     * (Từ MenuListener) Được gọi khi nhấn nút "Exit" trên MenuScreen.
+     */
     @Override
-    public void onExitGame() { // (Từ MenuListener)
+    public void onExitGame() {
         stage.close();
     }
 
+    /**
+     * (Từ MenuListener) Được gọi khi nhấn nút "Sound" trên MenuScreen.
+     */
     @Override
     public void onToggleSound() {
-        // Đảo ngược trạng thái
-        isSoundOn = !isSoundOn;
-
-        if (isSoundOn) {
-            // Nếu bật, thì phát nhạc
-            if (backgroundMusicPlayer != null) {
-                backgroundMusicPlayer.play();
-            }
-        } else {
-            // Nếu tắt, thì dừng nhạc
-            if (backgroundMusicPlayer != null) {
-                backgroundMusicPlayer.pause();
-            }
-        }
+        // Yêu cầu SoundManager xử lý việc bật/tắt
+        SoundManager.getInstance().toggleSound();
 
         // Báo cho MenuScreen cập nhật lại hình ảnh nút sound on/off
         if (menuScreen != null) {
-            menuScreen.updateSoundButtons(isSoundOn);
+            menuScreen.updateSoundButtons(SoundManager.getInstance().isMusicOn());
         }
-    }
-
-    // <<< THAY ĐỔI 4: IMPLEMENT HÀM MỚI TỪ GameOverListener >>>
-    @Override
-    public void onPlayAgain() {
-        // 1. Dọn dẹp màn hình game over
-        if (gameOverScreen != null) {
-            gameRoot.getChildren().remove(gameOverScreen);
-        }
-
-        // 2. Reset lại toàn bộ trạng thái game
-        gameManager = null;
-        gameLoop = null; // Đã stop, nhưng đặt là null để GC dọn
-        gameRoot = null;
-        gameScene = null;
-        gameOverScreen = null; // Tạo mới lần sau
-        pauseScreen = null; // Tạo mới lần sau
-        gameOver = false; // QUAN TRỌNG: Reset cờ
-
-        // 3. Hiển thị lại màn hình Menu
-        stage.setScene(menuScene);
     }
 
     /**
-     * Cập nhật trạng thái âm thanh (CHỈ CẬP NHẬT UI).
+     * (Từ GameOverListener) Được gọi khi nhấn nút "Play Again" trên GameOverScreen.
      */
+    @Override
+    public void onPlayAgain() {
+        // Dọn dẹp màn hình game over
+        if (gameOverScreen != null) {
+            gameRoot.getChildren().remove(gameOverScreen);
+        }
+        // Reset toàn bộ trạng thái game
+        gameManager = null;
+        gameLoop = null;
+        gameRoot = null;
+        gameScene = null;
+        gameOverScreen = null;
+        pauseScreen = null;
+        gameOver = false;
 
-    // --- HÀM MAIN (Không thay đổi) ---
+        // Quay trở lại màn hình Menu
+        stage.setScene(menuScene);
+    }
+
+    // --- HÀM MAIN (Điểm vào) ---
     public static void main(String[] args) {
         launch(args);
     }

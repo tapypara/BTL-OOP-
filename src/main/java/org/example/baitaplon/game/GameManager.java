@@ -1,73 +1,71 @@
-// <<< SỬA DÒNG PACKAGE >>>
 package org.example.baitaplon.game;
 
-import javafx.scene.canvas.GraphicsContext;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-
-// <<< THÊM IMPORT CHO CÁC LỚP MODEL >>>
+import javafx.scene.canvas.GraphicsContext;
 import org.example.baitaplon.model.Ball;
 import org.example.baitaplon.model.Brick;
 import org.example.baitaplon.model.Paddle;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import javafx.scene.media.AudioClip;
-
+import org.example.baitaplon.powerup.PowerUp;
+import org.example.baitaplon.sound.SoundManager;
 import org.example.baitaplon.stat.StatManager;
 
-
+/**
+ * Lớp quản lý chính (Controller) cho logic của trò chơi.
+ * Chịu trách nhiệm quản lý trạng thái game, cập nhật đối tượng,
+ * xử lý va chạm và tải các màn chơi (level).
+ */
 public class GameManager {
-    // ... (Code giữ nguyên) ...
-    private boolean soundEnabled = false; // Mặc định là tắt
-    private AudioClip paddleHitSound;
-    private AudioClip brickHitSound;
 
     public static final int SCREEN_WIDTH = 800;
     public static final int SCREEN_HEIGHT = 600;
 
-    private Paddle paddle; // Đã import
-    private Ball ball;     // Đã import
-    private List<Brick> bricks; // Đã import
+    private Paddle paddle;
+    private Ball ball;
+    private List<Brick> bricks;
+    private List<PowerUp> powerUps;
+
     private boolean isGameOver;
     private boolean isPaused = false;
-
-    private int currentLevel;
-    private static final int MAX_LEVEL = 5; // Ví dụ có 5 level
     private boolean isGameWon = false;
 
-    // <<< THÊM HẰNG SỐ MẠNG SỐNG >>>
-    private static final int INITIAL_LIVES = 2;
+    private int currentLevel;
+    private static final int MAX_LEVEL = 5; // Số màn chơi tối đa
+    private static final int INITIAL_LIVES = 2; // Số mạng ban đầu
 
-    private StatManager statManager;
+    private StatManager statManager; // Lớp quản lý điểm và mạng sống
 
     public GameManager() {
         paddle = new Paddle(350, 550, 100, 20, 5.0, SCREEN_WIDTH);
         ball = new Ball(0, 0, 10, 2, 0.5, -0.866);
-        ball.setPaddleReference(paddle);
+        ball.setPaddleReference(paddle); // Gắn bóng vào thanh đỡ
         ball.setStuck(true);
 
         bricks = new ArrayList<>();
-        currentLevel = 1; // Bắt đầu từ level 1
+        this.powerUps = new ArrayList<>();
+        currentLevel = 1;
         isGameOver = false;
         isGameWon = false;
         isPaused = false;
 
-        // <<< THAY THẾ KHỞI TẠO >>>
         this.statManager = new StatManager(INITIAL_LIVES);
 
-        loadSounds();
-        // <<< THAY THẾ createBricks() BẰNG loadLevel() >>>
         try {
-            loadLevel(currentLevel); // Tải level đầu tiên
+            loadLevel(currentLevel);
         } catch (Exception e) {
             System.err.println("LỖI NGHIÊM TRỌNG: Không thể tải level " + currentLevel + ": " + e.getMessage());
-            // Nếu không tải được level, coi như game over ngay
             isGameOver = true;
         }
     }
 
-    // ... (Các hàm readLevelFile và loadLevel giữ nguyên y hệt như file bạn gửi) ...
+    /**
+     * Đọc nội dung từ file level .txt trong thư mục /resources/levels.
+     *
+     * @param levelNumber Số thứ tự của màn chơi.
+     * @return Chuỗi String chứa 70 ký tự (hoặc null nếu lỗi).
+     */
     private String readLevelFile(int levelNumber) {
         String filePath = "/levels/level" + levelNumber + ".txt";
         try (InputStream is = getClass().getResourceAsStream(filePath)) {
@@ -76,35 +74,44 @@ public class GameManager {
                 return null;
             }
             String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            // Xóa tất cả các ký tự xuống dòng, tab...
             return content.replaceAll("[\\n\\r\\t]", "");
-
         } catch (Exception e) {
             System.err.println("Lỗi khi đọc file level " + levelNumber + ": " + e.getMessage());
             return null;
         }
     }
 
+    /**
+     * Tải và xây dựng màn chơi dựa trên dữ liệu từ file level.
+     *
+     * @param levelNumber Số thứ tự màn chơi.
+     * @throws Exception Nếu file level không hợp lệ.
+     */
     private void loadLevel(int levelNumber) throws Exception {
         bricks.clear();
-        ball.setStuck(true);
+        this.powerUps.clear();
+        ball.setStuck(true); // Gắn lại bóng vào thanh đỡ khi bắt đầu màn mới
 
         String levelData = readLevelFile(levelNumber);
 
-        // --- VALIDATION ---
+        // --- Xác thực dữ liệu level ---
         if (levelData == null) {
             throw new Exception("File level " + levelNumber + " rỗng hoặc không tìm thấy.");
         }
         if (levelData.length() != 70) {
-            throw new Exception("File level " + levelNumber + " không chứa đúng 70 ký tự (đã có " + levelData.length() + ").");
+            throw new Exception(
+                    "File level " + levelNumber + " không chứa đúng 70 ký tự (đã có " + levelData.length()
+                            + ").");
         }
-        if (levelData.matches(".*[^a-h_ ].*")) {
-            throw new Exception("File level " + levelNumber + " chứa ký tự không hợp lệ (chỉ cho phép a-h, _, và dấu cách).");
+        if (levelData.matches(".*[^a-j_ ].*")) {
+            throw new Exception("File level " + levelNumber + " chứa ký tự không hợp lệ.");
         }
-        // --- Hết VALIDATION ---
 
-        int brickWidth = 80;
-        int brickHeight = 40;
-        final int INITIAL_Y = 50;
+        // --- Cấu hình gạch ---
+        int brickWidth = 80;  // 800 / 10 cột
+        int brickHeight = 40; // Chiều cao cố định
+        final int INITIAL_Y = 50; // Vị trí Y bắt đầu vẽ hàng gạch đầu tiên
         final int ROWS = 7;
         final int COLS = 10;
 
@@ -116,40 +123,46 @@ public class GameManager {
                 char brickType = levelData.charAt(charIndex);
                 charIndex++;
 
+                // Dựa vào ký tự để tạo loại gạch tương ứng
                 switch (brickType) {
-                    case 'a': // blue_brick.png (1 HP)
+                    case 'a': // Gạch 1 máu
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "blue_brick"));
                         break;
-                    case 'b': // red_brick.png (2 HP)
+                    case 'b': // Gạch 2 máu
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 2, "red_brick"));
                         break;
-                    case 'c': // green_brick.png (3 HP)
+                    case 'c': // Gạch 3 máu
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 3, "green_brick"));
                         break;
-                    case 'd': // yellow_brick.png (4 HP)
+                    case 'd': // Gạch 4 máu
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 4, "yellow_brick"));
                         break;
-                    case 'e': // pink_brick.png
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "pink_brick"));
+                    case 'e': // Power-up: Thêm mạng
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "addlife_brick"));
                         break;
-                    case 'f': // white_brick.png
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "white_brick"));
+                    case 'f': // Power-up: Giảm tốc bóng
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "speeddown_brick"));
                         break;
-                    case 'h': // doubleball_brick.png
-                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "doubleball_brick"));
+                    case 'h': // Power-up: Tăng kích thước thanh đỡ
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "upsidepaddle_brick"));
                         break;
-                    case 'g': // unbreakable_brick.png (Bất tử)
+                    case 'g': // Gạch không thể phá hủy
                         bricks.add(new Brick(x, y, brickWidth, brickHeight, 999, "unbreakable_brick"));
+                        break;
+                    case 'i': // Gạch bom
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "bomb_brick"));
+                        break;
+                    case 'j': // Power-up: Tăng tốc bóng
+                        bricks.add(new Brick(x, y, brickWidth, brickHeight, 1, "speedup_brick"));
                         break;
                     case '_':
                     case ' ':
+                        // Bỏ qua, không tạo gạch
                         break;
                 }
             }
         }
     }
-    // ... (Kết thúc các hàm load level) ...
-
 
     public void pause() {
         isPaused = true;
@@ -171,68 +184,87 @@ public class GameManager {
         return isGameWon;
     }
 
+    /**
+     * Kiểm tra xem tất cả gạch (trừ gạch "unbreakable") đã bị phá hủy chưa.
+     *
+     * @return true nếu đã phá hết, false nếu còn.
+     */
     private boolean areAllBricksCleared() {
         for (Brick brick : bricks) {
-            if (!brick.isDestroyed()) {
-                return false; // Còn gạch chưa vỡ
+            // Nếu tìm thấy một gạch còn sống VÀ không phải là gạch không thể vỡ
+            if (!brick.isDestroyed() && !brick.getType().equals("unbreakable_brick")) {
+                return false;
             }
         }
-        return true; // Tất cả gạch đã vỡ
+        return true; // Không tìm thấy gạch nào còn sống
     }
 
+    /**
+     * Chuyển sang màn chơi tiếp theo hoặc kết thúc game nếu đã hoàn thành màn cuối.
+     */
     private void goToNextLevel() {
         this.currentLevel++;
         if (this.currentLevel > MAX_LEVEL) {
-            this.isGameWon = true; // Thắng game!
+            this.isGameWon = true; // Thắng game
             System.out.println("Chúc mừng! Bạn đã thắng!");
         } else {
-            // Tải level tiếp theo
+            // Qua màn: Reset lại số mạng về ban đầu (nhưng giữ nguyên điểm)
+            this.statManager.resetLives();
+
             try {
-                loadLevel(this.currentLevel);
+                loadLevel(this.currentLevel); // Tải màn chơi mới
             } catch (Exception e) {
                 System.err.println("LỖI: Không thể tải level " + this.currentLevel + ": " + e.getMessage());
-                isGameOver = true;
+                isGameOver = true; // Kết thúc game nếu không tải được màn
             }
         }
     }
 
-    public void setSoundEnabled(boolean enabled) {
-        this.soundEnabled = enabled;
-    }
-
+    /**
+     * Hàm cập nhật chính, được gọi liên tục bởi AnimationTimer trong MainApplication.
+     * Dùng để cập nhật logic của tất cả các đối tượng trong game.
+     */
     public void updateGame() {
         if (isPaused) {
-            return;
+            return; // Dừng cập nhật nếu game đang tạm dừng
         }
 
         if (!isGameOver && !isGameWon) {
             paddle.update();
             ball.update();
-            checkCollisions(); // Logic Game Over/Trừ mạng đã được chuyển vào đây
 
+            // Cập nhật các Power-up
+            // (Dùng vòng lặp for-i để tránh ConcurrentModificationException khi xóa)
+            for (int i = 0; i < powerUps.size(); i++) {
+                PowerUp powerUp = powerUps.get(i);
+                powerUp.update(); // Cho power-up di chuyển (rơi xuống)
+
+                // Nếu va chạm với thanh đỡ, kích hoạt
+                if (powerUp.isAlive() && powerUp.checkCollision(paddle)) {
+                    powerUp.activate(this);
+                }
+
+                // Nếu power-up không còn "sống" (đã kích hoạt hoặc rơi ra ngoài), xóa nó
+                if (!powerUp.isAlive()) {
+                    powerUps.remove(i);
+                    i--;
+                }
+            }
+
+            checkCollisions(); // Kiểm tra va chạm (Bóng-Tường, Bóng-Gạch...)
+
+            // Kiểm tra điều kiện thắng màn
             if (areAllBricksCleared()) {
                 goToNextLevel();
             }
-        } else {
-            // Không làm gì nếu game đã kết thúc
         }
     }
 
-    private void loadSounds() {
-        try {
-            String paddleSoundPath = "/assets/paddle_hit.wav";
-            String brickSoundPath = "/assets/brick_hit.wav";
-            paddleHitSound = new AudioClip(getClass().getResource(paddleSoundPath).toExternalForm());
-            brickHitSound = new AudioClip(getClass().getResource(brickSoundPath).toExternalForm());
-        } catch (Exception e) {
-            System.err.println("⚠ Lỗi khi tải file âm thanh (SFX): " + e.getMessage());
-            paddleHitSound = null;
-            brickHitSound = null;
-        }
-    }
-
+    /**
+     * Xử lý logic va chạm của bóng với tường, thanh đỡ và gạch.
+     */
     private void checkCollisions() {
-        // Va chạm tường
+        // 1. Va chạm tường (Trái, Phải, Trên)
         if (ball.getX() <= 0 || ball.getX() + ball.getWidth() >= SCREEN_WIDTH) {
             ball.setDirectionX(-ball.getDirectionX());
         }
@@ -240,76 +272,76 @@ public class GameManager {
             ball.setDirectionY(-ball.getDirectionY());
         }
 
-        // <<< THAY ĐỔI: LOGIC KHI BÓNG RƠI XUỐNG ĐÁY >>>
+        // 2. Va chạm đáy (Rớt bóng)
         if (ball.getY() + ball.getHeight() >= SCREEN_HEIGHT) {
-            if (!isGameOver && !isGameWon) { // Thêm check isGameWon
-
-                // 1. Trừ 1 mạng
+            if (!isGameOver && !isGameWon) {
                 this.statManager.loseLife();
-
-                // 2. Kiểm tra xem hết mạng chưa
                 if (this.statManager.isOutOfLives()) {
                     System.out.println("Game Over!");
-                    isGameOver = true; // Hết mạng -> Chính thức Game Over
+                    isGameOver = true;
                 } else {
-                    // 3. Nếu còn mạng, reset bóng
-                    ball.setStuck(true);
+                    ball.setStuck(true); // Reset bóng về thanh đỡ
                 }
             }
         }
-        // <<< KẾT THÚC THAY ĐỔI >>>
 
-        // Va chạm Paddle
+        // 3. Va chạm với Thanh đỡ (Paddle)
         if (ball.checkCollision(paddle)) {
+            // Chỉ nảy lên nếu bóng đang đi xuống (tránh lỗi kẹt bóng)
             if (ball.getDirectionY() > 0) {
                 ball.bounceOff(paddle);
-                if (soundEnabled && paddleHitSound != null) {
-                    paddleHitSound.play();
-                }
+                SoundManager.getInstance().playPaddleHit(); // Phát âm thanh
             }
         }
 
-        // Va chạm Gạch
-        Iterator<Brick> brickIterator = bricks.iterator();
-        while (brickIterator.hasNext()) {
-            Brick brick = brickIterator.next();
-
-            // Bỏ qua gạch đã vỡ
+        // 4. Va chạm với Gạch (Bricks)
+        for (Brick brick : bricks) {
             if (brick.isDestroyed()) {
-                continue;
+                continue; // Bỏ qua gạch đã vỡ
             }
 
             if (ball.checkCollision(brick)) {
-                ball.bounceOff(brick);
+                ball.bounceOff(brick); // Bóng nảy ra
 
-                // <<< THAY ĐỔI: Gọi hàm addScore của StatManagement >>>
-                int points = brick.takeHit();
+                // Gạch nhận sát thương và xử lý logic (trả về điểm)
+                int points = brick.takeHit(this);
                 this.statManager.addScore(points);
-                if ( brickHitSound != null) {
-                    brickHitSound.play();
-                }
 
-                if (brick.isDestroyed()) {
-                    // (Bạn sẽ thêm logic spawn power-up ở đây)
+                // Phát âm thanh va chạm gạch (nếu có)
+                if (brick.getType().equals("bomb_brick")) {
+                    SoundManager.getInstance().playExplosion();
+                } else {
+                    // Chỉ phát tiếng nếu gạch bị ảnh hưởng (trừ gạch unbreakable)
+                    if (points > 0 || !brick.getType().equals("unbreakable_brick")) {
+                        SoundManager.getInstance().playBrickHit();
+                    }
                 }
-
-                // Logic đã chuẩn: Không xóa gạch, chỉ break
-                break;
+                break; // Dừng vòng lặp (giả định bóng chỉ va chạm 1 gạch/khung hình)
             }
         }
     }
 
+    /**
+     * Vẽ (render) tất cả các đối tượng game lên Canvas.
+     *
+     * @param gc GraphicsContext để vẽ.
+     */
     public void renderGame(GraphicsContext gc) {
-        // <<< THAY ĐỔI: Yêu cầu StatManager tự vẽ (cả điểm và mạng) >>>
-        this.statManager.render(gc);
+        // Vẽ các thông số (điểm, mạng)
+        this.statManager.render(gc, SCREEN_WIDTH, SCREEN_HEIGHT);
 
+        // Vẽ các đối tượng
         paddle.render(gc);
         ball.render(gc);
         for (Brick brick : bricks) {
-            brick.render(gc); // File Brick.java đã tự check !isDestroyed()
+            brick.render(gc); // (Gạch đã vỡ sẽ tự động không vẽ)
         }
-        // (Đây là nơi bạn sẽ vẽ PowerUp)
+        for (PowerUp powerUp : powerUps) {
+            powerUp.render(gc); // (Power-up đã kích hoạt sẽ tự động không vẽ)
+        }
     }
+
+    // --- Các hàm Getters để các lớp khác truy cập ---
 
     public Paddle getPaddle() {
         return paddle;
@@ -319,12 +351,19 @@ public class GameManager {
         return ball;
     }
 
-    // <<< THAY ĐỔI: getScore() giờ gọi từ statManager >>>
     public int getScore() {
         return this.statManager.getScore();
     }
 
-    public boolean isSoundEnabled() {
-        return soundEnabled;
+    public StatManager getStatManager() {
+        return statManager;
+    }
+
+    public List<Brick> getBricks() {
+        return bricks;
+    }
+
+    public List<PowerUp> getPowerUps() {
+        return powerUps;
     }
 }

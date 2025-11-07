@@ -1,10 +1,13 @@
-// <<< FILE MỚI - ĐỊNH NGHĨA PACKAGE >>>
 package org.example.baitaplon.ui;
 
 /**
- * Interface "callback" để PauseScreen giao tiếp với MainApplication.
- * Nó báo cho MainApplication biết khi nào người dùng nhấn nút "Resume".
+ * Interface (cầu nối) để PauseScreen giao tiếp ngược lại với MainApplication.
+ * Báo cho MainApplication biết khi nào người dùng nhấn nút "Resume".
  */
 public interface PauseListener {
+
+    /**
+     * Được gọi khi người chơi nhấn nút "Resume".
+     */
     void onResume();
 }

@@ -1,0 +1,7 @@
+e_a_h_b_e_
+f_b_e_c_f_
+h_c_f_d_h_
+e_d_h_a_e_
+f_a_e_b_f_
+h_b_f_c_h_
+a_c_e_d_a_

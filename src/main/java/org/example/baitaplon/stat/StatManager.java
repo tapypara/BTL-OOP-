@@ -1,80 +1,116 @@
 package org.example.baitaplon.stat;
 
+import java.net.URL;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import org.example.baitaplon.game.GameManager;
 
 /**
- * Lớp này quản lý tất cả các chỉ số của game (Điểm, Mạng).
- * Nó gộp logic của ScoreManager và LivesManagement.
+ * Quản lý các thông số của người chơi, bao gồm điểm số và mạng sống.
+ * Lớp này cũng chịu trách nhiệm render các thông số này lên màn hình.
  */
 public class StatManager {
 
-    // --- Biến quản lý điểm ---
     private int score;
-    private double scoreX = 10;  // Tọa độ X để vẽ điểm
-    private double scoreY = 35;  // Tọa độ Y để vẽ điểm (trên hàng gạch Y=50)
-
-    // --- Biến quản lý mạng sống ---
-    private int initialLives;
     private int currentLives;
-    private double livesX = GameManager.SCREEN_WIDTH - 100; // Tọa độ X (góc phải)
-    private double livesY = 35; // Tọa độ Y
+    private final int initialLives; // Số mạng ban đầu khi bắt đầu game/level
 
-    /**
-     * Khởi tạo trình quản lý chỉ số.
-     * @param initialLives Số mạng bắt đầu.
-     */
+    private Image heartImage; // Ảnh trái tim để hiển thị mạng sống
+    private static final int HEART_SIZE = 25;
+    private static final int HEART_SPACING = 5;
+
     public StatManager(int initialLives) {
         this.initialLives = initialLives;
-        reset(); // Cài đặt giá trị ban đầu
+        reset(); // Reset điểm và mạng về ban đầu
+        loadHeartImage();
     }
 
     /**
-     * Vẽ tất cả chỉ số (Điểm và Mạng) lên Canvas.
+     * Tải hình ảnh trái tim từ thư mục /assets.
      */
-    public void render(GraphicsContext gc) {
-        gc.setFill(Color.WHITE);
-        gc.setFont(Font.font("Verdana", FontWeight.BOLD, 18));
-
-        // 1. Vẽ Score
-        gc.fillText("SCORE: " + this.score, this.scoreX, this.scoreY);
-
-        // 2. Vẽ Lives
-        gc.fillText("LIVES: " + this.currentLives, this.livesX, this.livesY);
-    }
-
-    /**
-     * Đặt lại cả điểm và mạng sống về ban đầu (khi bắt đầu game mới).
-     */
-    public void reset() {
-        this.score = 0;
-        this.currentLives = this.initialLives;
-    }
-
-    // --- Các hàm xử lý ---
-
-    public void addScore(int points) {
-        this.score += points;
-    }
-
-    public int getScore() {
-        return this.score;
-    }
-
-    public void loseLife() {
-        if (this.currentLives > 0) {
-            this.currentLives--;
+    private void loadHeartImage() {
+        URL imageUrl = getClass().getResource("/assets/heart.png");
+        if (imageUrl != null) {
+            heartImage = new Image(imageUrl.toExternalForm());
+        } else {
+            System.err.println("Lỗi: Không tìm thấy file heart.png tại /assets/heart.png");
         }
     }
 
-    public boolean isOutOfLives() {
-        return this.currentLives <= 0;
+    /**
+     * Reset toàn bộ trạng thái (dùng khi bắt đầu game mới).
+     * Đặt lại cả điểm và mạng sống.
+     */
+    public void reset() {
+        score = 0;
+        currentLives = initialLives;
     }
 
-    public int getLives() {
-        return this.currentLives;
+    /**
+     * Chỉ reset số mạng về giá trị ban đầu (dùng khi qua level mới).
+     * KHÔNG reset điểm.
+     */
+    public void resetLives() {
+        this.currentLives = this.initialLives;
+    }
+
+    public void addScore(int points) {
+        score += points;
+    }
+
+    public void loseLife() {
+        if (currentLives > 0) {
+            currentLives--;
+        }
+    }
+
+    /**
+     * Thêm một mạng (dùng cho power-up).
+     */
+    public void addLife() {
+        currentLives++;
+    }
+
+    public boolean isOutOfLives() {
+        return currentLives <= 0;
+    }
+
+    public int getScore() {
+        return score;
+    }
+
+    public int getCurrentLives() {
+        return currentLives;
+    }
+
+    /**
+     * Vẽ điểm số và mạng sống lên Canvas.
+     *
+     * @param gc          GraphicsContext để vẽ.
+     * @param screenWidth Chiều rộng màn hình (để căn lề phải).
+     * @param screenHeight Không dùng trong code này, nhưng có thể hữu ích.
+     */
+    public void render(GraphicsContext gc, double screenWidth, double screenHeight) {
+        // 1. Vẽ điểm số (góc trên bên trái)
+        gc.setFill(Color.WHITE);
+        gc.setFont(Font.font("Arial", FontWeight.BOLD, 20));
+        gc.fillText("Score: " + score, 10, 25);
+
+        // 2. Vẽ mạng sống (góc trên bên phải)
+        if (heartImage != null) {
+            // Vị trí bắt đầu vẽ trái tim (căn lề phải)
+            double startX = screenWidth - (currentLives * (HEART_SIZE + HEART_SPACING));
+            double y = 5; // Vị trí Y cố định
+
+            for (int i = 0; i < currentLives; i++) {
+                gc.drawImage(heartImage, startX + (i * (HEART_SIZE + HEART_SPACING)), y, HEART_SIZE,
+                        HEART_SIZE);
+            }
+        } else {
+            // Thay thế bằng chữ nếu không tải được ảnh trái tim
+            gc.fillText("Lives: " + currentLives, screenWidth - 100, 25);
+        }
     }
 }

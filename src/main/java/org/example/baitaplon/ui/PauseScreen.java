@@ -1,4 +1,3 @@
-// <<< SỬA DÒNG PACKAGE >>>
 package org.example.baitaplon.ui;
 
 import javafx.geometry.Pos;
@@ -7,31 +6,20 @@ import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
-import javafx.scene.effect.DropShadow;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
-
-// <<< THÊM IMPORT CHO INTERFACE MỚI >>>
-import org.example.baitaplon.ui.PauseListener;
 
 /**
  * Màn hình hiển thị khi game tạm dừng, sử dụng hình ảnh.
+ * Là một StackPane được thêm vào gameRoot trong MainApplication.
  */
 public class PauseScreen extends StackPane {
-
-    // <<< XÓA INTERFACE Ở ĐÂY >>>
-    // public interface PauseListener { ... } // (Đã bị xóa và chuyển ra file riêng)
-
 
     private Image backgroundImage;
     private Image continueButtonImage;
 
-    // <<< Tham số (PauseListener listener) giờ sẽ import từ file riêng >>>
     public PauseScreen(PauseListener listener) {
-        // ... (Toàn bộ code bên trong hàm khởi tạo giữ nguyên) ...
         setAlignment(Pos.CENTER);
 
+        // 1. Tải hình ảnh
         try {
             String bgPath = "/assets/pause_screen.png";
             backgroundImage = new Image(getClass().getResource(bgPath).toExternalForm());
@@ -39,40 +27,42 @@ public class PauseScreen extends StackPane {
             continueButtonImage = new Image(getClass().getResource(btnPath).toExternalForm());
         } catch (NullPointerException | IllegalArgumentException e) {
             System.err.println("⚠ Lỗi khi load ảnh màn hình pause: " + e.getMessage());
+            // Nếu lỗi, dùng nền đen mờ
             setStyle("-fx-background-color: rgba(0, 0, 0, 0.7);");
         }
 
+        // 2. Thêm ảnh nền (nếu tải thành công)
         ImageView backgroundView = null;
         if (backgroundImage != null) {
             backgroundView = new ImageView(backgroundImage);
             getChildren().add(backgroundView);
-        } else {
-            if (getStyle() == null || getStyle().isEmpty()) {
-                setStyle("-fx-background-color: rgba(0, 0, 0, 0.7);");
-            }
         }
 
+        // 3. Xóa các node cũ (nếu có, đề phòng)
         getChildren().removeIf(node -> node instanceof Label || node instanceof Button);
 
+        // 4. Thêm nút Continue (hoặc nút thay thế)
         ImageView continueButtonView = null;
         if (continueButtonImage != null) {
             continueButtonView = new ImageView(continueButtonImage);
 
             final ImageView finalContinueButtonView = continueButtonView;
 
-            // <<< THAY ĐỔI: Đồng bộ hiệu ứng hover giống MenuScreen >>>
+            // Thêm hiệu ứng hover
             finalContinueButtonView.setOnMouseEntered(e -> finalContinueButtonView.setOpacity(0.8));
             finalContinueButtonView.setOnMouseExited(e -> finalContinueButtonView.setOpacity(1.0));
 
+            // Gán sự kiện click
             finalContinueButtonView.setOnMouseClicked(e -> listener.onResume());
-            finalContinueButtonView.setTranslateY(100);
+            finalContinueButtonView.setTranslateY(100); // Đẩy nút xuống dưới tâm một chút
             getChildren().add(finalContinueButtonView);
 
         } else {
+            // Nếu không tải được ảnh nút, dùng Button text thay thế
             System.err.println("⚠ Không load được ảnh nút Continue, dùng nút chữ thay thế.");
             Button resumeButtonFallback = new Button("Resume");
-            resumeButtonFallback.setFont(Font.font("Verdana", FontWeight.BOLD, 20));
-            resumeButtonFallback.setStyle("-fx-text-fill: white; -fx-background-color: darkred; -fx-border-color: white;");
+            resumeButtonFallback.setStyle(
+                    "-fx-text-fill: white; -fx-background-color: darkred; -fx-border-color: white;");
             resumeButtonFallback.setOnAction(e -> listener.onResume());
             getChildren().add(resumeButtonFallback);
         }

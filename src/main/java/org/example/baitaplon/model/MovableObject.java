@@ -1,16 +1,13 @@
-// <<< SỬA DÒNG PACKAGE >>>
 package org.example.baitaplon.model;
 
 import javafx.scene.canvas.GraphicsContext;
 
 /**
- * Lớp trừu tượng mở rộng từ GameObject,
- * ...
+ * Lớp trừu tượng mở rộng từ GameObject.
+ * Đại diện cho các đối tượng có thể di chuyển, thêm khái niệm vận tốc (dx, dy).
  */
-// <<< GameObject ở cùng package nên KHÔNG CẦN IMPORT >>>
 public abstract class MovableObject extends GameObject {
 
-    // ... (Toàn bộ code bên trong giữ nguyên) ...
     protected double dx;
     protected double dy;
 
@@ -36,6 +33,9 @@ public abstract class MovableObject extends GameObject {
         this.dy = dy;
     }
 
+    /**
+     * Cập nhật vị trí (x, y) dựa trên vận tốc (dx, dy) hiện tại.
+     */
     protected void move() {
         x += dx;
         y += dy;

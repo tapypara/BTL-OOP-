@@ -1,14 +1,13 @@
-// <<< SỬA DÒNG PACKAGE >>>
 package org.example.baitaplon.model;
 
 import javafx.scene.canvas.GraphicsContext;
 
 /**
- * Lớp trừu tượng đại diện cho mọi đối tượng trong game.
- * ...
+ * Lớp trừu tượng đại diện cho mọi đối tượng trong game (gạch, bóng, thanh đỡ).
+ * Định nghĩa các thuộc tính và hành vi cơ bản nhất.
  */
 public abstract class GameObject {
-    // ... (Toàn bộ code bên trong giữ nguyên) ...
+
     protected double x;
     protected double y;
     protected double width;
@@ -41,10 +40,19 @@ public abstract class GameObject {
         return width;
     }
 
+    public void setWidth(double width) {
+        this.width = width;
+    }
+
     public double getHeight() {
         return height;
     }
 
+    public void setHeight(double height) {
+        this.height = height;
+    }
+
     public abstract void update();
+
     public abstract void render(GraphicsContext gc);
 }
