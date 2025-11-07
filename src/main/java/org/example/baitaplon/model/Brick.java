@@ -2,10 +2,6 @@ package org.example.baitaplon.model;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
-import org.example.baitaplon.game.GameManager;
-import org.example.baitaplon.powerup.PowerUp;
-
-import java.util.List;
 
 /**
  * Đại diện cho viên gạch trong game.
@@ -56,108 +52,56 @@ public class Brick extends GameObject {
      * Giảm HP và chuyển loại (thay đổi ảnh) nếu là gạch thường.
      * Vỡ ngay lập tức nếu là gạch power-up.
      */
-    public int takeHit(GameManager gm) {
-        List<Brick>  bricks = gm.getBricks();
-        List<PowerUp> powerUps = gm.getPowerUps();
-
-        // Gạch không thể phá vỡ thì bỏ qua luôn
-        if ("unbreakable_brick".equals(this.type)) {
-            hitPoints = 999; // Đảm bảo HP luôn cao
-            return 10; // Vẫn tính điểm va chạm
+    public int takeHit() {
+        // 1. Xử lý gạch bất tử (loại 'g')
+        if (this.type.equals("unbreakable_brick")) {
+            this.hitPoints = 999; // Luôn giữ 999
+            return 0; // Không làm gì thêm
         }
 
-        // Giảm HP
+        // 2. Xử lý gạch Power-up (loại e, f, h) -> Vỡ ngay
+        if (this.type.equals("pink_brick") ||
+                this.type.equals("white_brick") ||
+                this.type.equals("doubleball_brick")) {
+
+            this.hitPoints = 0; // Vỡ ngay lập tức
+            return 50; // Không làm gì thêm
+        }
+
+        // 3. Xử lý gạch thường (a, b, c, d)
+        // Chỉ giảm HP nếu lớn hơn 0
         if (this.hitPoints > 0) {
             this.hitPoints--;
         }
 
-        // KIỂM TRA: Gạch đã bị phá hủy sau cú va chạm này chưa?
+        // 4. Kiểm tra xem gạch đã vỡ chưa
         if (isDestroyed()) {
-            // NẾU GẠCH VỠ: Xử lý logic "khi vỡ" (spawn PU, nổ bom)
-            switch (this.type) {
-                case "upsidepaddle_brick":
-                case "downsidepaddle_brick": // Bạn cần thêm case này vào hàm spawnPU
-                case "speedup_brick":
-                case "speeddown_brick":
-                case "addlife_brick":
-                    this.spawnPU(gm); // <- Bây giờ code sẽ chạy tới đây
-                    break;
-                // ... (các case power-up khác)
-
-                case "bomb_brick":
-                    // 1. Lấy TÂM của quả bom
-                    double bombCenterX = this.getX() + 40; // Giả sử gạch rộng 80
-                    double bombCenterY = this.getY() + 20; // Giả sử gạch cao 40
-
-                    for(Brick brick : bricks) {
-
-                        // 2. Lấy TÂM của gạch lân cận
-                        double otherCenterX = brick.getX() + 40;
-                        double otherCenterY = brick.getY() + 20;
-
-                        // 3. So sánh TÂM VỚI TÂM
-                        // Kiểm tra xem gạch này có nằm trong lưới 3x3 xung quanh quả bom không
-                        if (Math.abs(otherCenterX - bombCenterX) <= 80 && // Cách biệt 0 (chính nó) hoặc 80 (trái/phải)
-                                Math.abs(otherCenterY - bombCenterY) <= 40 && // Cách biệt 0 (chính nó) hoặc 40 (trên/dưới)
-                                brick.hitPoints > 0) { // Chỉ ảnh hưởng gạch còn sống (tránh tự nổ)
-
-                            // --- Logic bên trong giữ nguyên như của bạn ---
-                            String tmp =  brick.getType();
-                            if(tmp.equals("yellow_brick") || tmp.equals("red_brick") ||
-                                    tmp.equals("green_brick") || tmp.equals("blue_brick")) {
-                                brick.hitPoints = 0; // Phá hủy gạch thường
-                            }
-                            else {
-                                // Kích hoạt gạch đặc biệt khác (ví dụ: bom nổ dây chuyền)
-                                brick.takeHit(gm);
-                            }
-
-                            // Đảm bảo gạch power-up bị nổ vẫn rớt đồ
-                            if(brick.isDestroyed()) {
-                                brick.spawnPU(gm);
-                            }
-                        }
-                    }
-                    break; // Kết thúc case "bomb_brick"
-
-                // ... (các case khác)
-                // Gạch thường khi vỡ (blue_brick) không cần làm gì thêm ở đây
-            }
-            return 10; // Trả điểm khi gạch vỡ
-
-        } else {
-            // NẾU GẠCH CHƯA VỠ: Xử lý logic "đổi màu"
-            switch (this.type) {
-                case "yellow_brick": // (HP từ 4 -> 3)
-                    this.type = "green_brick";
-                    loadImageByType(this.type);
-                    break;
-                case "green_brick": // (HP từ 3 -> 2)
-                    this.type = "red_brick";
-                    loadImageByType(this.type);
-                    break;
-                case "red_brick": // (HP từ 2 -> 1)
-                    this.type = "blue_brick";
-                    loadImageByType(this.type);
-                    break;
-            }
-            return 10; // Trả điểm khi va chạm (chưa vỡ)
+            return 10; // Vỡ rồi, không cần chuyển loại
         }
-    }
-    public void spawnPU(GameManager gm) {
-        List<PowerUp> powerUps = gm.getPowerUps();
-        String Type = this.type;
-        // THÊM "downsidepaddle_brick" VÀO ĐÂY
-        if(type.equals("upsidepaddle_brick") || type.equals("speedup_brick")
-                || type.equals("speeddown_brick") || type.equals("addlife_brick")
-                || type.equals("downsidepaddle_brick")) { // <-- THÊM VÀO ĐÂY
-            powerUps.add(new PowerUp(this.x, this.y, Type));
-        } else {
-            return;
-        }
-    }
 
+        // 5. Logic chuyển loại gạch (d -> c -> b -> a)
+        // Nếu gạch chưa vỡ, nó sẽ đổi ảnh
+        switch (this.type) {
+            case "yellow_brick": // 'd' (HP từ 4 -> 3)
+                this.type = "green_brick"; // Chuyển thành 'c'
+                loadImageByType(this.type); // Tải ảnh mới (green)
+                break;
+            case "green_brick": // 'c' (HP từ 3 -> 2)
+                this.type = "red_brick"; // Chuyển thành 'b'
+                loadImageByType(this.type); // Tải ảnh mới (red)
+                break;
+            case "red_brick": // 'b' (HP từ 2 -> 1)
+                this.type = "blue_brick"; // Chuyển thành 'a'
+                loadImageByType(this.type); // Tải ảnh mới (blue)
+                break;
+            case "blue_brick": // 'a' (HP từ 1 -> 0)
+                // Đã vỡ, không cần làm gì
+                break;
+        }
+        return 10;
+    }
     // <<< KẾT THÚC HÀM VIẾT LẠI >>>
+
 
     /**
      * Hàm isDestroyed() (Giữ nguyên)
